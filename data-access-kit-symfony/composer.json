@@ -1,0 +1,38 @@
+{
+    "name": "data-access-kit/data-access-kit-symfony",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Kulhan",
+            "email": "ahoj@jakubkulhan.cz"
+        }
+    ],
+    "require": {
+        "data-access-kit/data-access-kit": "*@dev",
+        "symfony/dependency-injection": "^7.0",
+        "symfony/http-kernel": "^7.0",
+        "symfony/config": "^7.0",
+        "symfony/finder": "^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../data-access-kit",
+            "symlink": true
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "DataAccessKit\\Symfony\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DataAccessKit\\Symfony\\": "test/"
+        }
+    }
+}
