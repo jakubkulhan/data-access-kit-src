@@ -1,0 +1,30 @@
+{
+    "type": "project",
+    "require": {
+        "php": ">=8.3",
+        "data-access-kit/data-access-kit": "*@dev",
+        "data-access-kit/data-access-kit-symfony": "*@dev"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.1",
+        "spatie/phpunit-snapshot-assertions": "^5.1"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./data-access-kit",
+            "symlink": true
+        },
+        {
+            "type": "path",
+            "url": "./data-access-kit-symfony",
+            "symlink": true
+        }
+    ],
+    "autoload-dev": {
+        "psr-4": {
+            "DataAccessKit\\": "data-access-kit/test/",
+            "DataAccessKit\\Symfony\\": "data-access-kit-symfony/test/"
+        }
+    }
+}
