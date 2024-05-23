@@ -1,0 +1,31 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class VariableSQLRepository implements VariableSQLRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function findByTitleAffixAndNotId(
+		string $titleAffix,
+		int $id,
+	): array
+	{
+		$result = $this->persistence->query(Foo::class, '
+				SELECT
+					id,
+					title
+				FROM foos
+				WHERE
+				(title LIKE CONCAT(\'%\', ?) 
+				    OR title LIKE CONCAT(?, \'%\'))
+				AND id != ?', [$titleAffix, $titleAffix, $id]);
+		return iterator_to_array($result);
+	}
+}

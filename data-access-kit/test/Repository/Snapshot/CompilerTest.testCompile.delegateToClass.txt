@@ -1,0 +1,30 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+final class DelegateToClassRepository implements DelegateToClassRepositoryInterface
+{
+	public function __construct(
+		private readonly DeepThought $deepThought,
+	)
+	{
+	}
+
+	public function alias(): int
+	{
+		return $this->deepThought->computeTheAnswer(...func_get_args());
+	}
+
+	public function computeTheAnswer(): int
+	{
+		return $this->deepThought->computeTheAnswer(...func_get_args());
+	}
+
+	public function withArguments(
+		int $a,
+		int $b,
+	): int
+	{
+		return $this->deepThought->multiply(...func_get_args());
+	}
+}

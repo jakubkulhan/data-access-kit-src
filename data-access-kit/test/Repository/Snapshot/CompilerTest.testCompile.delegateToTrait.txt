@@ -1,0 +1,20 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+final class DelegateToTraitRepository implements DelegateToTraitRepositoryInterface
+{
+	private object $deepThoughtTrait;
+
+	public function __construct(
+		#[PassAttribute(s: 's', i: 1, a: ['a'])] int $deepThoughtTraitAnswerToTheUltimateQuestionOfLifeTheUniverseAndEverything,
+	)
+	{
+		$this->deepThoughtTrait = new class($deepThoughtTraitAnswerToTheUltimateQuestionOfLifeTheUniverseAndEverything) { use DeepThoughtTrait; };
+	}
+
+	public function computeTheAnswer(): int
+	{
+		return $this->deepThoughtTrait->computeTheAnswer(...func_get_args());
+	}
+}

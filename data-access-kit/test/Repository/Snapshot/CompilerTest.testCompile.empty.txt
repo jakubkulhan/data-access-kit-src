@@ -1,0 +1,7 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+final class EmptyRepository implements EmptyRepositoryInterface
+{
+}

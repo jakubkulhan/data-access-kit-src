@@ -1,0 +1,30 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+final class DelegateToInterfaceRepository implements DelegateToInterfaceRepositoryInterface
+{
+	public function __construct(
+		private readonly DeepThoughtInterface $deepThoughtInterface,
+	)
+	{
+	}
+
+	public function alias(): int
+	{
+		return $this->deepThoughtInterface->computeTheAnswer(...func_get_args());
+	}
+
+	public function computeTheAnswer(): int
+	{
+		return $this->deepThoughtInterface->computeTheAnswer(...func_get_args());
+	}
+
+	public function withArguments(
+		int $a,
+		int $b,
+	): int
+	{
+		return $this->deepThoughtInterface->multiply(...func_get_args());
+	}
+}

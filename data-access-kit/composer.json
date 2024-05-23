@@ -1,0 +1,29 @@
+{
+    "name": "data-access-kit/data-access-kit",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jakub Kulhan",
+            "email": "ahoj@jakubkulhan.cz"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "doctrine/dbal": "^3.0|^4.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.1",
+        "spatie/phpunit-snapshot-assertions": "^5.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "DataAccessKit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DataAccessKit\\": "test/"
+        }
+    }
+}

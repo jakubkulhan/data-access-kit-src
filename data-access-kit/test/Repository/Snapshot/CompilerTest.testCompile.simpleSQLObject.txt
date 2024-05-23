@@ -1,0 +1,26 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class SimpleSQLObjectRepository implements SimpleSQLObjectRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function getFirst(): Foo
+	{
+		$result = $this->persistence->query(Foo::class, 'SELECT id, title FROM foos WHERE id = (SELECT MIN(id) FROM foos)', []);
+		$objects = iterator_to_array($result);
+		if (count($objects) === 0) {
+			throw new LogicException("Not found");
+		} else if (count($objects) > 1) {
+			throw new LogicException("Multiple objects found");
+		}
+		return $objects[0];
+	}
+}
