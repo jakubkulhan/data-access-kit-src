@@ -1,0 +1,25 @@
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  split-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        project:
+          - data-access-kit
+          - data-access-kit-symfony
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          git config --global user.name "Jakub Kulhan"
+          git config --global user.email "ahoj@jakubkulhan.cz"
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.DATA_ACCESS_KIT_DEPLOY_KEY }}
+            ${{ secrets.DATA_ACCESS_KIT_SYMFONY_DEPLOY_KEY }}
+      - run: git subtree split --prefix=${{ matrix.project }} --branch project-branch
+      - run: git push --force git@github.com:${{ github.repository_owner }}/${{ matrix.project }}.git project-branch:main
