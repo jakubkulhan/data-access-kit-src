@@ -2,16 +2,14 @@
 
 namespace DataAccessKit\Repository\Attribute;
 
-
 use Attribute;
 
 #[Attribute(Attribute::TARGET_METHOD)]
-class Count
+class SQLFile
 {
 	public function __construct(
-		public readonly ?string $from = null,
-		public readonly string $alias = "t",
-		public readonly ?string $where = null,
+		public readonly string $file,
+		public readonly ?string $itemType = null,
 	)
 	{
 	}

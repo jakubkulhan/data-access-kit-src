@@ -167,7 +167,7 @@ class Persistence implements PersistenceInterface
 				if ($column->primary) {
 					$where[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
 					$whereValues[] = $value;
-				} else if ($columns === null || in_array($column->name, $columns, true)) {
+				} else if (!$column->generated && ($columns === null || in_array($column->name, $columns, true))) {
 					$set[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
 					$setValues[] = $value;
 				}

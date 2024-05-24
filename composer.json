@@ -26,5 +26,8 @@
             "DataAccessKit\\": "data-access-kit/test/",
             "DataAccessKit\\Symfony\\": "data-access-kit-symfony/test/"
         }
+    },
+    "scripts": {
+        "test": "phpunit"
     }
 }
