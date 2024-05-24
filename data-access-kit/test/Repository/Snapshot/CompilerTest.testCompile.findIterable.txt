@@ -3,15 +3,11 @@
 namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\PersistenceInterface;
-use DataAccessKit\Registry;
-use DataAccessKit\ValueConverterInterface;
 
 final class FindIterableRepository implements FindIterableRepositoryInterface
 {
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
-		private readonly Registry $registry,
-		private readonly ValueConverterInterface $valueConverter,
 	)
 	{
 	}
@@ -20,8 +16,7 @@ final class FindIterableRepository implements FindIterableRepositoryInterface
 		string $title,
 	): iterable
 	{
-		$_table = $this->registry->get(Foo::class);
-		$result = $this->persistence->query(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.title = ?', [$this->valueConverter->objectToDatabase($_table, $_table->columns['title'], $title)]);
+		$result = $this->persistence->query(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.title = ?', [$title]);
 		return $result;
 	}
 }

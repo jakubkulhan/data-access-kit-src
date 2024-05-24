@@ -25,6 +25,9 @@ class Registry
 		$className = is_object($objectOrClass) ? get_class($objectOrClass) : $objectOrClass;
 
 		if (isset($this->tablesByClassName[$className])) {
+			if ($requireTable && $this->tablesByClassName[$className]->name === null) {
+				throw static::missingTableException($className);
+			}
 			return $this->tablesByClassName[$className];
 		}
 
@@ -32,11 +35,7 @@ class Registry
 		$tableRA = $rc->getAttributes(Table::class)[0] ?? null;
 		if ($tableRA === null) {
 			if ($requireTable) {
-				throw new LogicException(sprintf(
-					"Class %s is missing #[\\%s] attribute.",
-					$className,
-					Table::class,
-				));
+				throw static::missingTableException($className);
 			}
 
 			$table = new Table();
@@ -76,6 +75,15 @@ class Registry
 		$table->setColumns($columns);
 
 		return $this->tablesByClassName[$className] = $table;
+	}
+
+	private static function missingTableException(object|string $className): LogicException
+	{
+		return new LogicException(sprintf(
+			"Class %s is missing #[\\%s] attribute.",
+			$className,
+			Table::class,
+		));
 	}
 
 }
