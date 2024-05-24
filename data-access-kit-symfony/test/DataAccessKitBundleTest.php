@@ -2,10 +2,11 @@
 
 namespace DataAccessKit\Symfony;
 
+use DataAccessKit\Persistence;
+use DataAccessKit\Symfony\Fixture\DummyPersistence;
 use DataAccessKit\Symfony\Fixture\FooRepository;
 use DataAccessKit\Symfony\Fixture\FooRepositoryInterface;
 use DataAccessKit\Symfony\Fixture\FooService;
-use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -51,9 +52,8 @@ class DataAccessKitBundleTest extends TestCase
 				public function registerContainerConfiguration(LoaderInterface $loader)
 				{
 					$loader->load(function (ContainerBuilder $container) {
-						$connDef = new Definition(Connection::class);
-						$connDef->setAutowired(false);
-						$container->setDefinition(Connection::class, $connDef);
+						$persistenceDef = new Definition(DummyPersistence::class);
+						$container->setDefinition(Persistence::class, $persistenceDef);
 
 						$svcDef = new Definition(FooService::class);
 						$svcDef->setAutowired(true);
