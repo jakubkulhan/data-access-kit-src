@@ -45,7 +45,7 @@ class Compiler
 	{
 		$this->registerMethodCompiler(SQL::class, $sqlMethodCompiler = new SQLMethodCompiler());
 		$this->registerMethodCompiler(Find::class, new FindMethodCompiler($registry, $sqlMethodCompiler));
-		$this->registerMethodCompiler(Count::class, new CountMethodCompiler());
+		$this->registerMethodCompiler(Count::class, new CountMethodCompiler($registry, $sqlMethodCompiler));
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
 	}
 

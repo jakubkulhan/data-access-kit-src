@@ -37,6 +37,8 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			} else {
 				$itemAlias = $result->use($attribute->itemType);
 			}
+		} else if ($returnType->isBuiltin()) {
+			$itemAlias = $returnType->getName();
 		} else {
 			$itemAlias = $result->use($returnType->getName());
 		}

@@ -1,0 +1,28 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class CountRepository implements CountRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function countByTitle(
+		string $title,
+	): int
+	{
+		$result = $this->persistence->query(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$title]);
+		$objects = iterator_to_array($result);
+		if (count($objects) === 0) {
+			throw new LogicException("Not found");
+		} else if (count($objects) > 1) {
+			throw new LogicException("Multiple objects found");
+		}
+		return $objects[0];
+	}
+}

@@ -4,6 +4,7 @@ namespace DataAccessKit\Repository;
 
 use DataAccessKit\DefaultNameConverter;
 use DataAccessKit\Registry;
+use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToInterfaceRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToTraitRepositoryInterface;
@@ -71,6 +72,7 @@ class CompilerTest extends TestCase
 			FindArrayRepositoryInterface::class,
 			GetRepositoryInterface::class,
 			NullableGetRepositoryInterface::class,
+			CountRepositoryInterface::class,
 			PassClassAttributesRepositoryInterface::class,
 			PassMethodAttributesRepositoryInterface::class,
 			SimpleSQLIterableRepositoryInterface::class,
