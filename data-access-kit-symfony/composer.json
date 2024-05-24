@@ -18,13 +18,6 @@
     "require-dev": {
         "phpunit/phpunit": "^11.1"
     },
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../data-access-kit",
-            "symlink": true
-        }
-    ],
     "autoload": {
         "psr-4": {
             "DataAccessKit\\Symfony\\": "src/"
