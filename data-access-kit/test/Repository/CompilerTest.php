@@ -16,10 +16,12 @@ use DataAccessKit\Repository\Fixture\NoAttributeInterface;
 use DataAccessKit\Repository\Fixture\NullableGetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\PassClassAttributesRepositoryInterface;
 use DataAccessKit\Repository\Fixture\PassMethodAttributesRepositoryInterface;
+use DataAccessKit\Repository\Fixture\RelativeSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
+use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -80,6 +82,8 @@ class CompilerTest extends TestCase
 			SimpleSQLObjectRepositoryInterface::class,
 			SimpleSQLNullableObjectRepositoryInterface::class,
 			VariableSQLRepositoryInterface::class,
+			AbsoluteSQLFileRepositoryInterface::class,
+			RelativeSQLFileRepositoryInterface::class,
 			DelegateToClassRepositoryInterface::class,
 			DelegateToInterfaceRepositoryInterface::class,
 			DelegateToTraitRepositoryInterface::class,

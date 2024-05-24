@@ -8,9 +8,11 @@ use DataAccessKit\Repository\Attribute\Delegate;
 use DataAccessKit\Repository\Attribute\Find;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
+use DataAccessKit\Repository\Attribute\SQLFile;
 use DataAccessKit\Repository\Method\CountMethodCompiler;
 use DataAccessKit\Repository\Method\DelegateMethodCompiler;
 use DataAccessKit\Repository\Method\FindMethodCompiler;
+use DataAccessKit\Repository\Method\SQLFileMethodCompiler;
 use DataAccessKit\Repository\Method\SQLMethodCompiler;
 use InvalidArgumentException;
 use LogicException;
@@ -46,6 +48,7 @@ class Compiler
 		$this->registerMethodCompiler(SQL::class, $sqlMethodCompiler = new SQLMethodCompiler());
 		$this->registerMethodCompiler(Find::class, new FindMethodCompiler($registry, $sqlMethodCompiler));
 		$this->registerMethodCompiler(Count::class, new CountMethodCompiler($registry, $sqlMethodCompiler));
+		$this->registerMethodCompiler(SQLFile::class, new SQLFileMethodCompiler($sqlMethodCompiler));
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
 	}
 

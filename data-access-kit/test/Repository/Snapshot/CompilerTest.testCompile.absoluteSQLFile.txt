@@ -1,0 +1,24 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class AbsoluteSQLFileRepository implements AbsoluteSQLFileRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function findByTitle(
+		string $title,
+	): array
+	{
+		$result = $this->persistence->query(Foo::class, 'SELECT id, title
+		FROM foos
+		WHERE title = ?', [$title]);
+		return iterator_to_array($result);
+	}
+}
