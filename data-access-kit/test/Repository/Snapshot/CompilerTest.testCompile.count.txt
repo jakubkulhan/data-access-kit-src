@@ -4,8 +4,6 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
-use DataAccessKit\Repository\Exception\MultipleObjectsFoundException;
-use DataAccessKit\Repository\Exception\NotFoundException;
 
 final class CountRepository implements CountRepositoryInterface
 {
@@ -29,14 +27,7 @@ final class CountRepository implements CountRepositoryInterface
 		$arguments->title = $title;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->select(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$arguments['title']]);
-
-		$objects = iterator_to_array($result);
-		if (count($objects) === 0) {
-			throw new NotFoundException('int');
-		} else if (count($objects) > 1) {
-			throw new MultipleObjectsFoundException('int');
-		}
-		return $objects[0];
+		$result = $this->persistence->selectScalar('SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$arguments['title']]);
+		return (int)$result;
 	}
 }

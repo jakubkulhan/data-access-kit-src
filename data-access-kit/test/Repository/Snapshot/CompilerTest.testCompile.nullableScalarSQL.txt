@@ -1,0 +1,20 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class NullableScalarSQLRepository implements NullableScalarSQLRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function randomTitle(): ?string
+	{
+		$result = $this->persistence->selectScalar('SELECT title FROM foos ORDER BY RAND() LIMIT 1', []);
+		return $result === null ? null : (string)$result;
+	}
+}

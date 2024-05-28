@@ -16,6 +16,7 @@ use DataAccessKit\Repository\Fixture\FindIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\GetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\NoAttributeInterface;
 use DataAccessKit\Repository\Fixture\NullableGetRepositoryInterface;
+use DataAccessKit\Repository\Fixture\NullableScalarSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\PassClassAttributesRepositoryInterface;
 use DataAccessKit\Repository\Fixture\PassMethodAttributesRepositoryInterface;
 use DataAccessKit\Repository\Fixture\RelativeSQLFileRepositoryInterface;
@@ -82,6 +83,7 @@ class CompilerTest extends TestCase
 			SimpleSQLObjectRepositoryInterface::class,
 			SimpleSQLNullableObjectRepositoryInterface::class,
 			VariableSQLRepositoryInterface::class,
+			NullableScalarSQLRepositoryInterface::class,
 			AbsoluteSQLFileRepositoryInterface::class,
 			RelativeSQLFileRepositoryInterface::class,
 			DelegateToClassRepositoryInterface::class,

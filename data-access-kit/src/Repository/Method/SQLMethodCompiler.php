@@ -25,6 +25,15 @@ class SQLMethodCompiler implements MethodCompilerInterface
 {
 	public function compile(Result $result, ResultMethod $method, $attribute): void
 	{
+		$returnType = $method->reflection->getReturnType();
+		if (!$returnType instanceof ReflectionNamedType) {
+			throw new CompilerException(sprintf(
+				"Method [%s::%s] has unsupported return type. Please provide named return type (scalar, array, iterable, or class name).",
+				$result->reflection->getName(),
+				$method->reflection->getName(),
+			));
+		}
+
 		$constructor = $result->method("__construct");
 		$constructor->parameter("persistence")
 			->setVisibility("private readonly")
@@ -43,34 +52,6 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				$constructor->line("public {$phpType} \$" . $rp->getName() . ";");
 			}
 			$constructor->dedent()->line("};");
-		}
-
-		$returnType = $method->reflection->getReturnType();
-		if (!$returnType instanceof ReflectionNamedType) {
-			throw new CompilerException(sprintf(
-				"Method [%s::%s] has unsupported return type. Please provide named return type (scalar, array, iterable, or class name).",
-				$result->reflection->getName(),
-				$method->reflection->getName(),
-			));
-		}
-
-		$aliasUse = true;
-		if (in_array($returnType->getName(), ["iterable", "array"], true)) {
-			if ($attribute->itemType === null) {
-				$itemType = $result->repository->class;
-			} else {
-				$itemType = $attribute->itemType;
-			}
-		} else if ($returnType->isBuiltin()) {
-			$itemType = $returnType->getName();
-			$aliasUse = false;
-		} else {
-			$itemType = $returnType->getName();
-		}
-		if ($aliasUse) {
-			$itemAlias = $result->use($itemType);
-		} else {
-			$itemAlias = $itemType;
 		}
 
 		$reflectionParametersByName = [];
@@ -105,28 +86,65 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$method->line();
 		}
 
-		$method->line("\$result = \$this->persistence->select({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
-		$method->line();
-		if ($returnType->getName() === "iterable") {
-			$method->line("return \$result;");
-		} else if ($returnType->getName() === "array") {
-			$method->line("return iterator_to_array(\$result);");
-		} else {
-			$method
-				->line("\$objects = iterator_to_array(\$result);")
-				->line("if (count(\$objects) === 0) {");
-			if ($returnType->allowsNull()) {
-				$method->indent()->line("return null;")->dedent();
-			} else {
-				$notFoundExceptionAlias = $result->use(NotFoundException::class);
-				$method->indent()->line("throw new {$notFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent();
+		if ($returnType->isBuiltin() && !in_array($returnType->getName(), ["array", "iterable"], true)) {
+			if (!in_array($returnType->getName(), ["int", "float", "string", "bool"], true)) {
+				throw new CompilerException(sprintf(
+					"Method [%s::%s] has unsupported scalar return type [%s]. Please use int, float, string, or bool.",
+					$result->reflection->getName(),
+					$method->reflection->getName(),
+					$returnType->getName(),
+				));
 			}
-			$multipleObjectsFoundExceptionAlias = $result->use(MultipleObjectsFoundException::class);
-			$method
-				->line("} else if (count(\$objects) > 1) {")
-				->indent()->line("throw new {$multipleObjectsFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent()
-				->line("}")
-				->line("return \$objects[0];");
+			$method->line("\$result = \$this->persistence->selectScalar(" . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+			if ($returnType->allowsNull()) {
+				$method->line("return \$result === null ? null : ({$returnType->getName()})\$result;");
+			} else {
+				$method->line("return ({$returnType->getName()})\$result;");
+			}
+
+		} else {
+			$aliasUse = true;
+			if (in_array($returnType->getName(), ["iterable", "array"], true)) {
+				if ($attribute->itemType === null) {
+					$itemType = $result->repository->class;
+				} else {
+					$itemType = $attribute->itemType;
+				}
+			} else if ($returnType->isBuiltin()) {
+				$itemType = $returnType->getName();
+				$aliasUse = false;
+			} else {
+				$itemType = $returnType->getName();
+			}
+			if ($aliasUse) {
+				$itemAlias = $result->use($itemType);
+			} else {
+				$itemAlias = $itemType;
+			}
+
+			$method->line("\$result = \$this->persistence->select({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+			$method->line();
+			if ($returnType->getName() === "iterable") {
+				$method->line("return \$result;");
+			} else if ($returnType->getName() === "array") {
+				$method->line("return iterator_to_array(\$result);");
+			} else {
+				$method
+					->line("\$objects = iterator_to_array(\$result);")
+					->line("if (count(\$objects) === 0) {");
+				if ($returnType->allowsNull()) {
+					$method->indent()->line("return null;")->dedent();
+				} else {
+					$notFoundExceptionAlias = $result->use(NotFoundException::class);
+					$method->indent()->line("throw new {$notFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent();
+				}
+				$multipleObjectsFoundExceptionAlias = $result->use(MultipleObjectsFoundException::class);
+				$method
+					->line("} else if (count(\$objects) > 1) {")
+					->indent()->line("throw new {$multipleObjectsFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent()
+					->line("}")
+					->line("return \$objects[0];");
+			}
 		}
 	}
 }
