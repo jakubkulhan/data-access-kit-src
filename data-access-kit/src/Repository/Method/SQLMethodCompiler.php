@@ -7,6 +7,8 @@ use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Repository\Exception\CompilerException;
+use DataAccessKit\Repository\Exception\MultipleObjectsFoundException;
+use DataAccessKit\Repository\Exception\NotFoundException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
@@ -52,16 +54,23 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			));
 		}
 
+		$aliasUse = true;
 		if (in_array($returnType->getName(), ["iterable", "array"], true)) {
 			if ($attribute->itemType === null) {
-				$itemAlias = $result->use($result->repository->class);
+				$itemType = $result->repository->class;
 			} else {
-				$itemAlias = $result->use($attribute->itemType);
+				$itemType = $attribute->itemType;
 			}
 		} else if ($returnType->isBuiltin()) {
-			$itemAlias = $returnType->getName();
+			$itemType = $returnType->getName();
+			$aliasUse = false;
 		} else {
-			$itemAlias = $result->use($returnType->getName());
+			$itemType = $returnType->getName();
+		}
+		if ($aliasUse) {
+			$itemAlias = $result->use($itemType);
+		} else {
+			$itemAlias = $itemType;
 		}
 
 		$reflectionParametersByName = [];
@@ -109,11 +118,13 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			if ($returnType->allowsNull()) {
 				$method->indent()->line("return null;")->dedent();
 			} else {
-				$method->indent()->line("throw new LogicException(\"Not found\");")->dedent();
+				$notFoundExceptionAlias = $result->use(NotFoundException::class);
+				$method->indent()->line("throw new {$notFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent();
 			}
+			$multipleObjectsFoundExceptionAlias = $result->use(MultipleObjectsFoundException::class);
 			$method
 				->line("} else if (count(\$objects) > 1) {")
-				->indent()->line("throw new LogicException(\"Multiple objects found\");")->dedent()
+				->indent()->line("throw new {$multipleObjectsFoundExceptionAlias}(" . Compiler::varExport($itemType) . ");")->dedent()
 				->line("}")
 				->line("return \$objects[0];");
 		}

@@ -4,6 +4,7 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
+use DataAccessKit\Repository\Exception\MultipleObjectsFoundException;
 
 final class NullableGetRepository implements NullableGetRepositoryInterface
 {
@@ -33,7 +34,7 @@ final class NullableGetRepository implements NullableGetRepositoryInterface
 		if (count($objects) === 0) {
 			return null;
 		} else if (count($objects) > 1) {
-			throw new LogicException("Multiple objects found");
+			throw new MultipleObjectsFoundException('DataAccessKit\\Repository\\Fixture\\Foo');
 		}
 		return $objects[0];
 	}
