@@ -13,4 +13,9 @@ class Foo
 
 	#[Column]
 	public string $title;
+
+	#[Column]
+	public string $description;
+
+	public int $notColumn;
 }
