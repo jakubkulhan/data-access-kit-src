@@ -6,7 +6,7 @@ use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 
 #[Repository(Foo::class)]
-interface TableMacroRepositoryInterface
+interface MacroTableSQLRepositoryInterface
 {
 	#[SQL("SELECT * FROM %table")]
 	public function all(): iterable;

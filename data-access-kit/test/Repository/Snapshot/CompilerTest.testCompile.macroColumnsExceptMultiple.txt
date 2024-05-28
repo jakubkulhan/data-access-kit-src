@@ -1,0 +1,21 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class MacroColumnsExceptMultipleRepository implements MacroColumnsExceptMultipleRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function allColumnsExceptMultiple(): iterable
+	{
+		$result = $this->persistence->select(Foo::class, 'SELECT id FROM foos', []);
+
+		return $result;
+	}
+}

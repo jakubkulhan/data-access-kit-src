@@ -15,11 +15,15 @@ use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
 use LogicException;
 use ReflectionNamedType;
+use function array_keys;
+use function array_map;
+use function array_search;
+use function count;
 use function implode;
 use function in_array;
 use function preg_replace_callback;
+use function preg_split;
 use function sprintf;
-use function var_dump;
 
 /**
  * @implements MethodCompilerInterface<SQL>
@@ -155,12 +159,12 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<table>table\b)
 				|
-				%(?P<columns>columns(?:\(\s*
-					(?:except\s+(?P<columnsExcept>[a-zA-Z0-9_]+(?:\s*,\s*[a-zA-Z0-9_]+)*))?
-					(?:from\s+(?P<columnsFrom>[a-zA-Z0-9_]+))?
-				\s*\))?\b)
+				%(?P<columns>columns\b(?:\(\s*
+					(?:except\s+(?P<columnsExcept>[a-zA-Z0-9_]+(?:\s*,\s*[a-zA-Z0-9_]+)*)\s*)?
+					(?:from\s+(?P<columnsFrom>[a-zA-Z0-9_]+)\s*)?
+				\))?)
 				|
-				%(?P<macro>[a-zA-Z0-9_]+\b)
+				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
 			/xi',
 			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameters) {
 				if (!empty($m["variable"])) {
@@ -181,6 +185,47 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 				} else if (!empty($m["table"])) {
 					return $table->name;
+
+				} else if (!empty($m["columns"])) {
+					$columnNames = array_keys($table->columns);
+
+					if (!empty($m["columnsExcept"])) {
+						foreach (preg_split('/\s*,\s*/', $m["columnsExcept"]) as $exceptColumnName) {
+							$key = array_search($exceptColumnName, $columnNames, true);
+							if ($key === false) {
+								throw new CompilerException(sprintf(
+									"SQL for method [%s::%s] contains %%columns(except ...) where it excepts unknown column [%s].",
+									$result->reflection->getName(),
+									$method->reflection->getName(),
+									$exceptColumnName,
+								));
+							}
+
+							unset($columnNames[$key]);
+						}
+
+						if (count($columnNames) === 0) {
+							throw new CompilerException(sprintf(
+								"SQL for method [%s::%s] contains %%columns(except ...) where it excepts all columns.",
+								$result->reflection->getName(),
+								$method->reflection->getName(),
+							));
+						}
+					}
+
+					if (!empty($m["columnsFrom"])) {
+						$columnNames = array_map(fn(string $it) => $m["columnsFrom"] . "." . $it, $columnNames);
+					}
+
+					return implode(", ", $columnNames);
+
+				} else if (!empty($m["macro"])) {
+					throw new CompilerException(sprintf(
+						"SQL for method [%s::%s] contains unknown macro [%s].",
+						$result->reflection->getName(),
+						$method->reflection->getName(),
+						$m["macro"],
+					));
 
 				} else {
 					throw new LogicException("Unreachable statement.");

@@ -6,6 +6,12 @@ use DataAccessKit\DefaultNameConverter;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptFromRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleFromRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsFromRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToInterfaceRepositoryInterface;
@@ -24,7 +30,7 @@ use DataAccessKit\Repository\Fixture\SimpleSQLArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
-use DataAccessKit\Repository\Fixture\TableMacroRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroTableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -87,7 +93,13 @@ class CompilerTest extends TestCase
 			VariableSQLRepositoryInterface::class,
 			NullableScalarSQLRepositoryInterface::class,
 			VoidSQLRepositoryInterface::class,
-			TableMacroRepositoryInterface::class,
+			MacroTableSQLRepositoryInterface::class,
+			MacroColumnsRepositoryInterface::class,
+			MacroColumnsExceptRepositoryInterface::class,
+			MacroColumnsExceptMultipleRepositoryInterface::class,
+			MacroColumnsFromRepositoryInterface::class,
+			MacroColumnsExceptFromRepositoryInterface::class,
+			MacroColumnsExceptMultipleFromRepositoryInterface::class,
 			AbsoluteSQLFileRepositoryInterface::class,
 			RelativeSQLFileRepositoryInterface::class,
 			DelegateToClassRepositoryInterface::class,

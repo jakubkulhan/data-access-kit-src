@@ -1,0 +1,21 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class MacroColumnsRepository implements MacroColumnsRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function allColumns(): iterable
+	{
+		$result = $this->persistence->select(Foo::class, 'SELECT id, title, description FROM foos', []);
+
+		return $result;
+	}
+}

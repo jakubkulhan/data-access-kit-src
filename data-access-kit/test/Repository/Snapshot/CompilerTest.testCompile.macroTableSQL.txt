@@ -4,7 +4,7 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\PersistenceInterface;
 
-final class TableMacroRepository implements TableMacroRepositoryInterface
+final class MacroTableSQLRepository implements MacroTableSQLRepositoryInterface
 {
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
