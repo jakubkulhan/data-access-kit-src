@@ -153,6 +153,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		}
 
 		$sqlParameters = [];
+		$usedVariables = [];
 		$sql = preg_replace_callback(
 			'/
 				@(?P<variable>[a-zA-Z0-9_]+)
@@ -166,12 +167,12 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
 			/xi',
-			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameters) {
+			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameters, &$usedVariables) {
 				if (!empty($m["variable"])) {
 					$name = $m["variable"];
 					if (!isset($reflectionParametersByName[$name])) {
 						throw new CompilerException(sprintf(
-							"SQL for method [%s::%s] contains variable @%s, but method does not have parameter with this name.",
+							"SQL for method [%s::%s] contains variable @%s, but method does not have parameter with this name. Please check for typos.",
 							$result->reflection->getName(),
 							$method->reflection->getName(),
 							$name,
@@ -180,6 +181,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 					$rp = $reflectionParametersByName[$name];
 
 					$sqlParameters[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
+					$usedVariables[$name] = true;
 
 					return "?";
 
@@ -194,7 +196,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 							$key = array_search($exceptColumnName, $columnNames, true);
 							if ($key === false) {
 								throw new CompilerException(sprintf(
-									"SQL for method [%s::%s] contains %%columns(except ...) where it excepts unknown column [%s].",
+									"SQL for method [%s::%s] contains %%columns(except ...) where it excepts unknown column [%s]. Please check for typos.",
 									$result->reflection->getName(),
 									$method->reflection->getName(),
 									$exceptColumnName,
@@ -206,7 +208,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 						if (count($columnNames) === 0) {
 							throw new CompilerException(sprintf(
-								"SQL for method [%s::%s] contains %%columns(except ...) where it excepts all columns.",
+								"SQL for method [%s::%s] contains %%columns(except ...) where it excepts all columns. Remove columns from except clause, or remove the clause entirely.",
 								$result->reflection->getName(),
 								$method->reflection->getName(),
 							));
@@ -221,7 +223,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 				} else if (!empty($m["macro"])) {
 					throw new CompilerException(sprintf(
-						"SQL for method [%s::%s] contains unknown macro [%s].",
+						"SQL for method [%s::%s] contains unknown macro [%s]. Please check for typos.",
 						$result->reflection->getName(),
 						$method->reflection->getName(),
 						$m["macro"],
@@ -233,6 +235,18 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			},
 			$attribute->sql,
 		);
+
+		foreach ($reflectionParametersByName as $rp) {
+			if (!isset($usedVariables[$rp->getName()])) {
+				throw new CompilerException(sprintf(
+					"Method [%s::%s] has parameter \$%s, but SQL does not contain variable @%s. Please check for typos, or remove it from the method signature.",
+					$result->reflection->getName(),
+					$method->reflection->getName(),
+					$rp->getName(),
+					$rp->getName(),
+				));
+			}
+		}
 
 		return [
 			$sql,

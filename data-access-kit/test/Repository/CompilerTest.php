@@ -31,6 +31,7 @@ use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroTableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnusedVariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -77,7 +78,7 @@ class CompilerTest extends TestCase
 
 	public static function provideCompile()
 	{
-		$classes = [
+		return static::provideRepositoryClasses([
 			EmptyRepositoryInterface::class,
 			FindIterableRepositoryInterface::class,
 			FindArrayRepositoryInterface::class,
@@ -105,8 +106,28 @@ class CompilerTest extends TestCase
 			DelegateToClassRepositoryInterface::class,
 			DelegateToInterfaceRepositoryInterface::class,
 			DelegateToTraitRepositoryInterface::class,
-		];
+		]);
+	}
 
+	#[DataProvider("provideCompileError")]
+	public function testCompileError(string $interfaceName): void
+	{
+		try {
+			$this->compiler->compile($this->compiler->prepare(UnusedVariableSQLRepositoryInterface::class));
+		} catch (CompilerException $e) {
+			$this->assertMatchesSnapshot($e->getMessage());
+		}
+	}
+
+	public static function provideCompileError(): iterable
+	{
+		return static::provideRepositoryClasses([
+			UnusedVariableSQLRepositoryInterface::class,
+		]);
+	}
+
+	private static function provideRepositoryClasses(array $classes): iterable
+	{
 		foreach ($classes as $class) {
 			$p = strrpos($class, "\\");
 			yield lcfirst(str_replace("RepositoryInterface", "", substr($class, $p + 1))) => [$class];

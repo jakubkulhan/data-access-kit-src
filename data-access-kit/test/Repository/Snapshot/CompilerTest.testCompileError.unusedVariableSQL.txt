@@ -1,0 +1,1 @@
+Method [DataAccessKit\Repository\Fixture\UnusedVariableSQLRepositoryInterface::unusedVariable] has parameter $foo, but SQL does not contain variable @foo. Please check for typos, or remove it from the method signature.
