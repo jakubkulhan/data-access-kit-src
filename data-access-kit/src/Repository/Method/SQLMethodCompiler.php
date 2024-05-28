@@ -4,6 +4,7 @@ namespace DataAccessKit\Repository\Method;
 
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
+use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Repository\Exception\CompilerException;
@@ -12,17 +13,25 @@ use DataAccessKit\Repository\Exception\NotFoundException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
+use LogicException;
 use ReflectionNamedType;
 use function implode;
 use function in_array;
 use function preg_replace_callback;
 use function sprintf;
+use function var_dump;
 
 /**
  * @implements MethodCompilerInterface<SQL>
  */
 class SQLMethodCompiler implements MethodCompilerInterface
 {
+	public function __construct(
+		private readonly Registry $registry,
+	)
+	{
+	}
+
 	public function compile(Result $result, ResultMethod $method, $attribute): void
 	{
 		$returnType = $method->reflection->getReturnType();
@@ -54,28 +63,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$constructor->dedent()->line("};");
 		}
 
-		$reflectionParametersByName = [];
-		foreach ($method->reflection->getParameters() as $rp) {
-			$reflectionParametersByName[$rp->getName()] = $rp;
-		}
-
-		$sqlParameters = [];
-		$sql = preg_replace_callback('/@([a-zA-Z0-9_]+)/', static function ($m) use ($result, $method, $reflectionParametersByName, &$sqlParameters) {
-			$name = $m[1];
-			if (!isset($reflectionParametersByName[$name])) {
-				throw new CompilerException(sprintf(
-					"SQL for method [%s::%s] contains variable @%s, but method does not have parameter with this name.",
-					$result->reflection->getName(),
-					$method->reflection->getName(),
-					$name,
-				));
-			}
-			$rp = $reflectionParametersByName[$name];
-
-			$sqlParameters[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
-
-			return "?";
-		}, $attribute->sql);
+		[$sql, $sqlParameters] = $this->expandSQLMacrosAndVariables($method, $result, $attribute);
 
 		if ($method->reflection->getNumberOfParameters() > 0) {
 			$method->line("\$arguments = clone \$this->{$argumentsProperty};");
@@ -149,5 +137,61 @@ class SQLMethodCompiler implements MethodCompilerInterface
 					->line("return \$objects[0];");
 			}
 		}
+	}
+
+	private function expandSQLMacrosAndVariables(ResultMethod $method, Result $result, SQL $attribute): array
+	{
+		$table = $this->registry->get($result->repository->class, true);
+
+		$reflectionParametersByName = [];
+		foreach ($method->reflection->getParameters() as $rp) {
+			$reflectionParametersByName[$rp->getName()] = $rp;
+		}
+
+		$sqlParameters = [];
+		$sql = preg_replace_callback(
+			'/
+				@(?P<variable>[a-zA-Z0-9_]+)
+				|
+				%(?P<table>table\b)
+				|
+				%(?P<columns>columns(?:\(\s*
+					(?:except\s+(?P<columnsExcept>[a-zA-Z0-9_]+(?:\s*,\s*[a-zA-Z0-9_]+)*))?
+					(?:from\s+(?P<columnsFrom>[a-zA-Z0-9_]+))?
+				\s*\))?\b)
+				|
+				%(?P<macro>[a-zA-Z0-9_]+\b)
+			/xi',
+			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameters) {
+				if (!empty($m["variable"])) {
+					$name = $m["variable"];
+					if (!isset($reflectionParametersByName[$name])) {
+						throw new CompilerException(sprintf(
+							"SQL for method [%s::%s] contains variable @%s, but method does not have parameter with this name.",
+							$result->reflection->getName(),
+							$method->reflection->getName(),
+							$name,
+						));
+					}
+					$rp = $reflectionParametersByName[$name];
+
+					$sqlParameters[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
+
+					return "?";
+
+				} else if (!empty($m["table"])) {
+					return $table->name;
+
+				} else {
+					throw new LogicException("Unreachable statement.");
+				}
+			},
+			$attribute->sql,
+		);
+
+		return [
+			$sql,
+			$sqlParameters,
+		];
 	}
 }

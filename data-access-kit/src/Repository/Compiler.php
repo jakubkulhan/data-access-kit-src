@@ -45,7 +45,7 @@ class Compiler
 		Registry $registry,
 	)
 	{
-		$this->registerMethodCompiler(SQL::class, $sqlMethodCompiler = new SQLMethodCompiler());
+		$this->registerMethodCompiler(SQL::class, $sqlMethodCompiler = new SQLMethodCompiler($registry));
 		$this->registerMethodCompiler(Find::class, new FindMethodCompiler($registry, $sqlMethodCompiler));
 		$this->registerMethodCompiler(Count::class, new CountMethodCompiler($registry, $sqlMethodCompiler));
 		$this->registerMethodCompiler(SQLFile::class, new SQLFileMethodCompiler($sqlMethodCompiler));

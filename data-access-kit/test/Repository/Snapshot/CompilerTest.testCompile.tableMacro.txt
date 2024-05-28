@@ -1,0 +1,21 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class TableMacroRepository implements TableMacroRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function all(): iterable
+	{
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foos', []);
+
+		return $result;
+	}
+}

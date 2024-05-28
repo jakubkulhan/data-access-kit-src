@@ -24,6 +24,7 @@ use DataAccessKit\Repository\Fixture\SimpleSQLArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
+use DataAccessKit\Repository\Fixture\TableMacroRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -86,6 +87,7 @@ class CompilerTest extends TestCase
 			VariableSQLRepositoryInterface::class,
 			NullableScalarSQLRepositoryInterface::class,
 			VoidSQLRepositoryInterface::class,
+			TableMacroRepositoryInterface::class,
 			AbsoluteSQLFileRepositoryInterface::class,
 			RelativeSQLFileRepositoryInterface::class,
 			DelegateToClassRepositoryInterface::class,

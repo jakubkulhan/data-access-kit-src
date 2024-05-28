@@ -188,9 +188,9 @@ Array parameters are expanded to a list of placeholders. For example, if you hav
 There are also several macros that expand to SQL fragments.
 
 - `%columns` - expands to all columns specified by Column attributes.
-  - `%columns(alias: u)` - expands to all columns specified by Column attributes prefixed by the alias.
-  - `%columns(except: password)` - expands to all columns specified by Column attributes except the specified columns.
-  - `%columns(alias: u, except: password)` - combination of the previous two.
+  - `%columns(from u)` - expands to all columns specified by Column attributes prefixed by the alias.
+  - `%columns(except password)` - expands to all columns specified by Column attributes except the specified columns.
+  - `%columns(except password, long_description from u)` - combination of the previous two.
 - `%table` - expands to the table name.
 
 ### SQLFile
