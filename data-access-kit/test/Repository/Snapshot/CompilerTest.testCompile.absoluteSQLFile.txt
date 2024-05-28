@@ -27,7 +27,7 @@ final class AbsoluteSQLFileRepository implements AbsoluteSQLFileRepositoryInterf
 		$arguments->title = $title;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->query(Foo::class, 'SELECT id, title
+		$result = $this->persistence->select(Foo::class, 'SELECT id, title
 		FROM foos
 		WHERE title = ?', [$arguments['title']]);
 

@@ -7,12 +7,7 @@ use LogicException;
 
 class DummyPersistence implements PersistenceInterface
 {
-	public function query(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable
-	{
-		throw new LogicException("Not implemented");
-	}
-
-	public function select(string $className, string $alias = "t", ?callable $callback = null): iterable
+	public function select(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable
 	{
 		throw new LogicException("Not implemented");
 	}

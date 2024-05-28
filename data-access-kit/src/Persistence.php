@@ -21,7 +21,7 @@ class Persistence implements PersistenceInterface
 	{
 	}
 
-	public function query(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable
+	public function select(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable
 	{
 		$table = $this->registry->get($className);
 
@@ -36,24 +36,6 @@ class Persistence implements PersistenceInterface
 			}
 			yield $object;
 		}
-	}
-
-	public function select(string $className, string $alias = "t", ?callable $callback = null): iterable
-	{
-		$table = $this->registry->get($className, true);
-		$platform = $this->connection->getDatabasePlatform();
-
-		$qb = $this->connection->createQueryBuilder();
-		$qb->from($table->name, $alias);
-		foreach ($table->columns as $column) {
-			$qb->addSelect($platform->quoteSingleIdentifier($alias) . "." . $platform->quoteSingleIdentifier($column->name));
-		}
-
-		if ($callback !== null) {
-			$callback($qb);
-		}
-
-		return $this->query($className, $qb->getSQL(), $qb->getParameters(), $qb->getParameterTypes());
 	}
 
 	public function insert(object $object): void

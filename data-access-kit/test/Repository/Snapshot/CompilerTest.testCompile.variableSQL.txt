@@ -31,7 +31,7 @@ final class VariableSQLRepository implements VariableSQLRepositoryInterface
 		$arguments->id = $id;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->query(Foo::class, '
+		$result = $this->persistence->select(Foo::class, '
 				SELECT
 					id,
 					title

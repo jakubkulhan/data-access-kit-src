@@ -28,7 +28,7 @@ final class NullableGetRepository implements NullableGetRepositoryInterface
 		$arguments->id = $id;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->query(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.id = ?', [$arguments['id']]);
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.id = ?', [$arguments['id']]);
 
 		$objects = iterator_to_array($result);
 		if (count($objects) === 0) {

@@ -105,7 +105,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$method->line();
 		}
 
-		$method->line("\$result = \$this->persistence->query({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+		$method->line("\$result = \$this->persistence->select({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
 		$method->line();
 		if ($returnType->getName() === "iterable") {
 			$method->line("return \$result;");

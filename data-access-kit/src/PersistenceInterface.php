@@ -14,18 +14,7 @@ interface PersistenceInterface
 	 * @param array<int, mixed>|array<string, mixed> $parameterTypes
 	 * @return iterable<T>
 	 */
-	public function query(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable;
-
-	/**
-	 * Create a SELECT query for all columns of given class and return an iterable of objects of type $className.
-	 *
-	 * @template T
-	 * @param class-string<T> $className
-	 * @param string $alias
-	 * @param callable|null $callback
-	 * @return iterable<T>
-	 */
-	public function select(string $className, string $alias = "t", ?callable $callback = null): iterable;
+	public function select(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable;
 
 	/**
 	 * Insert $object into the database.

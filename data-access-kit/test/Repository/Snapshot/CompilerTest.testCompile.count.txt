@@ -29,7 +29,7 @@ final class CountRepository implements CountRepositoryInterface
 		$arguments->title = $title;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->query(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$arguments['title']]);
+		$result = $this->persistence->select(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$arguments['title']]);
 
 		$objects = iterator_to_array($result);
 		if (count($objects) === 0) {
