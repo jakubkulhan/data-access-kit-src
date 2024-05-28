@@ -15,6 +15,7 @@ final class SimpleSQLObjectRepository implements SimpleSQLObjectRepositoryInterf
 	public function getFirst(): Foo
 	{
 		$result = $this->persistence->query(Foo::class, 'SELECT id, title FROM foos WHERE id = (SELECT MIN(id) FROM foos)', []);
+
 		$objects = iterator_to_array($result);
 		if (count($objects) === 0) {
 			throw new LogicException("Not found");

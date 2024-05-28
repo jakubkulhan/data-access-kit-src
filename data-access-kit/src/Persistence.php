@@ -261,4 +261,14 @@ class Persistence implements PersistenceInterface
 		}
 	}
 
+	public function toRow(object $object): array
+	{
+		$table = $this->registry->get($object);
+		$row = [];
+		foreach ($table->columns as $column) {
+			$row[$column->name] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+		}
+		return $row;
+	}
+
 }

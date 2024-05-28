@@ -15,6 +15,7 @@ final class SimpleSQLArrayRepository implements SimpleSQLArrayRepositoryInterfac
 	public function findEmptyTitle(): array
 	{
 		$result = $this->persistence->query(Foo::class, 'SELECT id, title FROM foos WHERE title = \'\'', []);
+
 		return iterator_to_array($result);
 	}
 }

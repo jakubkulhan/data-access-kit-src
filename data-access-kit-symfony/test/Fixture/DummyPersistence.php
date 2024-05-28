@@ -56,4 +56,9 @@ class DummyPersistence implements PersistenceInterface
 	{
 		throw new LogicException("Not implemented");
 	}
+
+	public function toRow(object $object): array
+	{
+		throw new LogicException("Not implemented");
+	}
 }

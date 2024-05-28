@@ -79,4 +79,12 @@ interface PersistenceInterface
 	 * @return T
 	 */
 	public function transactional(callable $callback): mixed;
+
+	/**
+	 * Convert $object to an associative array.
+	 *
+	 * @param object $object
+	 * @return array
+	 */
+	public function toRow(object $object): array;
 }

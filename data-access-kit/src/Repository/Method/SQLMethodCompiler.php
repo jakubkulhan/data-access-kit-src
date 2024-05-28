@@ -2,6 +2,7 @@
 
 namespace DataAccessKit\Repository\Method;
 
+use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Compiler;
@@ -28,6 +29,21 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			->setVisibility("private readonly")
 			->setType($result->use(PersistenceInterface::class));
 
+		if ($method->reflection->getNumberOfParameters() > 0) {
+			$argumentsProperty = $method->name . "Arguments";
+			$result->property($argumentsProperty)
+				->setVisibility("private")
+				->setType("object");
+			$columnAlias = $result->use(Column::class);
+			$constructor->line("\$this->{$argumentsProperty} = new class {")->indent();
+			foreach ($method->reflection->getParameters() as $rp) {
+				$phpType = Compiler::phpType($result, $rp->getType());
+				$constructor->line("#[{$columnAlias}(name: \"{$rp->getName()}\")]");
+				$constructor->line("public {$phpType} \$" . $rp->getName() . ";");
+			}
+			$constructor->dedent()->line("};");
+		}
+
 		$returnType = $method->reflection->getReturnType();
 		assert($returnType instanceof ReflectionNamedType);
 
@@ -48,8 +64,8 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$reflectionParametersByName[$rp->getName()] = $rp;
 		}
 
-		$parameters = [];
-		$sql = preg_replace_callback('/@([a-zA-Z0-9_]+)/', static function ($m) use ($result, $method, $reflectionParametersByName, &$parameters) {
+		$sqlParameters = [];
+		$sql = preg_replace_callback('/@([a-zA-Z0-9_]+)/', static function ($m) use ($result, $method, $reflectionParametersByName, &$sqlParameters) {
 			$name = $m[1];
 			if (!isset($reflectionParametersByName[$name])) {
 				throw new LogicException(sprintf(
@@ -61,12 +77,22 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			}
 			$rp = $reflectionParametersByName[$name];
 
-			$parameters[] = '$' . $rp->getName();
+			$sqlParameters[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
 
 			return "?";
 		}, $attribute->sql);
 
-		$method->line("\$result = \$this->persistence->query({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $parameters) . "]);");
+		if ($method->reflection->getNumberOfParameters() > 0) {
+			$method->line("\$arguments = clone \$this->{$argumentsProperty};");
+			foreach ($method->reflection->getParameters() as $rp) {
+				$method->line("\$arguments->{$rp->getName()} = \$" . $rp->getName() . ";");
+			}
+			$method->line("\$arguments = \$this->persistence->toRow(\$arguments);");
+			$method->line();
+		}
+
+		$method->line("\$result = \$this->persistence->query({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+		$method->line();
 		if ($returnType->getName() === "iterable") {
 			$method->line("return \$result;");
 		} else if ($returnType->getName() === "array") {

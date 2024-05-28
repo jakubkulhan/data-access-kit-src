@@ -2,14 +2,23 @@
 
 namespace DataAccessKit\Repository\Fixture;
 
+use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 
 final class VariableSQLRepository implements VariableSQLRepositoryInterface
 {
+	private object $findByTitleAffixAndNotIdArguments;
+
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
 	)
 	{
+		$this->findByTitleAffixAndNotIdArguments = new class {
+			#[Column(name: "titleAffix")]
+			public string $titleAffix;
+			#[Column(name: "id")]
+			public int $id;
+		};
 	}
 
 	public function findByTitleAffixAndNotId(
@@ -17,6 +26,11 @@ final class VariableSQLRepository implements VariableSQLRepositoryInterface
 		int $id,
 	): array
 	{
+		$arguments = clone $this->findByTitleAffixAndNotIdArguments;
+		$arguments->titleAffix = $titleAffix;
+		$arguments->id = $id;
+		$arguments = $this->persistence->toRow($arguments);
+
 		$result = $this->persistence->query(Foo::class, '
 				SELECT
 					id,
@@ -25,7 +39,8 @@ final class VariableSQLRepository implements VariableSQLRepositoryInterface
 				WHERE
 				(title LIKE CONCAT(\'%\', ?) 
 				    OR title LIKE CONCAT(?, \'%\'))
-				AND id != ?', [$titleAffix, $titleAffix, $id]);
+				AND id != ?', [$arguments['titleAffix'], $arguments['titleAffix'], $arguments['id']]);
+
 		return iterator_to_array($result);
 	}
 }

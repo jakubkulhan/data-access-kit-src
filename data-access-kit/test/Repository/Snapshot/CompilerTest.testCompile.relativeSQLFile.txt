@@ -2,23 +2,35 @@
 
 namespace DataAccessKit\Repository\Fixture;
 
+use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 
 final class RelativeSQLFileRepository implements RelativeSQLFileRepositoryInterface
 {
+	private object $findByTitleArguments;
+
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
 	)
 	{
+		$this->findByTitleArguments = new class {
+			#[Column(name: "title")]
+			public string $title;
+		};
 	}
 
 	public function findByTitle(
 		string $title,
 	): array
 	{
+		$arguments = clone $this->findByTitleArguments;
+		$arguments->title = $title;
+		$arguments = $this->persistence->toRow($arguments);
+
 		$result = $this->persistence->query(Foo::class, 'SELECT id, title
 		FROM foos
-		WHERE title = ?', [$title]);
+		WHERE title = ?', [$arguments['title']]);
+
 		return iterator_to_array($result);
 	}
 }

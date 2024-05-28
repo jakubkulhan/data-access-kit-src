@@ -15,6 +15,7 @@ final class SimpleSQLIterableRepository implements SimpleSQLIterableRepositoryIn
 	public function findEmptyTitle(): iterable
 	{
 		$result = $this->persistence->query(Foo::class, 'SELECT id, title FROM foos WHERE title = \'\'', []);
+
 		return $result;
 	}
 }

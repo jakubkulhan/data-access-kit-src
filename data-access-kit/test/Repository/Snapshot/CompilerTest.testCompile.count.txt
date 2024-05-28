@@ -2,21 +2,33 @@
 
 namespace DataAccessKit\Repository\Fixture;
 
+use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 
 final class CountRepository implements CountRepositoryInterface
 {
+	private object $countByTitleArguments;
+
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
 	)
 	{
+		$this->countByTitleArguments = new class {
+			#[Column(name: "title")]
+			public string $title;
+		};
 	}
 
 	public function countByTitle(
 		string $title,
 	): int
 	{
-		$result = $this->persistence->query(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$title]);
+		$arguments = clone $this->countByTitleArguments;
+		$arguments->title = $title;
+		$arguments = $this->persistence->toRow($arguments);
+
+		$result = $this->persistence->query(int::class, 'SELECT COUNT(*) FROM foos t WHERE t.title = ?', [$arguments['title']]);
+
 		$objects = iterator_to_array($result);
 		if (count($objects) === 0) {
 			throw new LogicException("Not found");

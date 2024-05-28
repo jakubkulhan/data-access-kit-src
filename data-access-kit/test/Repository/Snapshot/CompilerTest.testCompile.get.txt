@@ -2,21 +2,33 @@
 
 namespace DataAccessKit\Repository\Fixture;
 
+use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 
 final class GetRepository implements GetRepositoryInterface
 {
+	private object $getByIdArguments;
+
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
 	)
 	{
+		$this->getByIdArguments = new class {
+			#[Column(name: "id")]
+			public int $id;
+		};
 	}
 
 	public function getById(
 		int $id,
 	): Foo
 	{
-		$result = $this->persistence->query(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.id = ?', [$id]);
+		$arguments = clone $this->getByIdArguments;
+		$arguments->id = $id;
+		$arguments = $this->persistence->toRow($arguments);
+
+		$result = $this->persistence->query(Foo::class, 'SELECT t.id, t.title FROM foos t WHERE t.id = ?', [$arguments['id']]);
+
 		$objects = iterator_to_array($result);
 		if (count($objects) === 0) {
 			throw new LogicException("Not found");
