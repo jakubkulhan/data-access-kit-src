@@ -38,6 +38,11 @@ class Persistence implements PersistenceInterface
 		}
 	}
 
+	public function selectScalar(string $sql, array $parameters = []): mixed
+	{
+		return $this->connection->executeQuery($sql, $parameters)->fetchOne();
+	}
+
 	public function insert(object $object): void
 	{
 		$this->insertUpsertAll([$object], []);

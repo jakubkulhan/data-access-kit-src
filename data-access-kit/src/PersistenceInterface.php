@@ -16,6 +16,15 @@ interface PersistenceInterface
 	public function select(string $className, string $sql, array $parameters = []): iterable;
 
 	/**
+	 * Run $sql with $parameters and return a scalar value.
+	 *
+	 * @param string $sql
+	 * @param array $parameters
+	 * @return scalar
+	 */
+	public function selectScalar(string $sql, array $parameters = []): mixed;
+
+	/**
 	 * Insert $object into the database.
 	 */
 	public function insert(object $object): void;
