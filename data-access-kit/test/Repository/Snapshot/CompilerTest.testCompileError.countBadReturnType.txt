@@ -1,0 +1,1 @@
+Count method [DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface::countByTitle] must return int to able to be generated. Either change the return type, add an attribute, or remove the method.

@@ -26,10 +26,10 @@ trait BuildWhereTrait
 			}
 			if ($column === null) {
 				throw new CompilerException(sprintf(
-					"Method [%s::%s] parameter [%s] does not match any property of [%s], and therefore cannot be used as a query condition.",
+					"Parameter [%s] of method [%s::%s] does not match any property of [%s], and therefore cannot be used as a query condition.",
+					$parameter->getName(),
 					$result->reflection->getName(),
 					$method->reflection->getName(),
-					$parameter->getName(),
 					$result->repository->class,
 				));
 			}

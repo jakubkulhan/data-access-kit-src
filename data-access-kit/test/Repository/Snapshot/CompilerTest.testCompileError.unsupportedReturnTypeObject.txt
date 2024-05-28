@@ -1,0 +1,1 @@
+Method [DataAccessKit\Repository\Fixture\UnsupportedReturnTypeObjectRepositoryInterface::find] has unsupported scalar return type [object]. Please use int, float, string, or bool.

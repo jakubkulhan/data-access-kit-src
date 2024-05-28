@@ -1,0 +1,1 @@
+Parameter [tytle] of method [DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface::findByTitle] does not match any property of [DataAccessKit\Repository\Fixture\Foo], and therefore cannot be used as a query condition.

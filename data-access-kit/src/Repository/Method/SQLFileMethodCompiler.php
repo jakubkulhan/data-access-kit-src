@@ -42,7 +42,7 @@ class SQLFileMethodCompiler implements MethodCompilerInterface
 			$file = dirname($result->reflection->getFileName()) . DIRECTORY_SEPARATOR . $file;
 		}
 
-		$contents = file_get_contents($file);
+		$contents = @file_get_contents($file);
 		if ($contents === false) {
 			throw new CompilerException(sprintf(
 				"SQL file for method [%s::%s] does not exist or is not readable.",

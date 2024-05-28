@@ -1,0 +1,1 @@
+SQL for method [DataAccessKit\Repository\Fixture\MacroUnknownRepositoryInterface::allColumns] contains unknown macro [clonums]. Please check for typos.

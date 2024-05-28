@@ -1,0 +1,1 @@
+Method [DataAccessKit\Repository\Fixture\UnsupportedReturnTypeMixedRepositoryInterface::find] has unsupported scalar return type [mixed]. Please use int, float, string, or bool.

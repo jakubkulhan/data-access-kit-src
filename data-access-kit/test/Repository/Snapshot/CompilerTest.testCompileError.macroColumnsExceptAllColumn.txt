@@ -1,0 +1,1 @@
+SQL for method [DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface::allColumnsExcept] contains %columns(except ...) where it excepts all columns. Remove columns from except clause, or remove the clause entirely.

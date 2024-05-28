@@ -1,0 +1,1 @@
+Find method [DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface::findByTitle] must return array, iterable, or [DataAccessKit\Repository\Fixture\Foo] to able to be generated. Either change the return type, add an attribute, or remove the method.

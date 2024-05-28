@@ -1,0 +1,1 @@
+Doesn't know how to generate method [DataAccessKit\Repository\Fixture\UnhandledMethodRepositoryInterface::unhandled]. Either change the method, add an attribute, or remove the method.

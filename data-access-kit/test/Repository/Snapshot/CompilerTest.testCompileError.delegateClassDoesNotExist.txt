@@ -1,0 +1,1 @@
+Delegate class [This\Class\Does\Not\Exist] referenced by method [DataAccessKit\Repository\Fixture\DelegateClassDoesNotExistRepositoryInterface::foo] does not exist. Please fix the class, interface, or trait reference.

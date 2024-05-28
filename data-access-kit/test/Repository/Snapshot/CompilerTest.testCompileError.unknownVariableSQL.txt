@@ -1,0 +1,1 @@
+SQL for method [DataAccessKit\Repository\Fixture\UnknownVariableSQLRepositoryInterface::findByTitle] contains variable @tytle, but method does not have parameter with this name. Please check for typos.

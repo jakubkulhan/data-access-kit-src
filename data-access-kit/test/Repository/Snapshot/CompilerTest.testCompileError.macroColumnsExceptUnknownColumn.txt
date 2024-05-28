@@ -1,0 +1,1 @@
+SQL for method [DataAccessKit\Repository\Fixture\MacroColumnsExceptUnknownColumnRepositoryInterface::allColumnsExcept] contains %columns(except ...) where it excepts unknown column [non_existent_column]. Please check for typos.

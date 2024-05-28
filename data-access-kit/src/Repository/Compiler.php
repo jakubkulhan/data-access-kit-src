@@ -71,8 +71,8 @@ class Compiler
 
 		if (!$repositoryInterface->isInterface()) {
 			throw new CompilerException(sprintf(
-				"The provided class name must be an interface, %s is not an interface.",
-				$repositoryInterface,
+				"The provided class name must be an interface, [%s] is not an interface.",
+				$repositoryInterface->getName(),
 			));
 		}
 
@@ -147,7 +147,7 @@ class Compiler
 					$returnType = $rm->getReturnType();
 					if (!$returnType instanceof ReflectionNamedType || !in_array($returnType->getName(), ["array", "iterable", $result->repository->class], true)) {
 						throw new CompilerException(sprintf(
-							"Method [%s::%s] must return array, iterable, or [%s] to able to be generated. Either change the return type, add an attribute, or remove the method.",
+							"Find method [%s::%s] must return array, iterable, or [%s] to able to be generated. Either change the return type, add an attribute, or remove the method.",
 							$result->reflection->getName(),
 							$rm->getName(),
 							$result->repository->class,
@@ -161,7 +161,7 @@ class Compiler
 					$returnType = $rm->getReturnType();
 					if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== "int") {
 						throw new CompilerException(sprintf(
-							"Method [%s::%s] must return int to able to be generated. Either change the return type, add an attribute, or remove the method.",
+							"Count method [%s::%s] must return int to able to be generated. Either change the return type, add an attribute, or remove the method.",
 							$result->reflection->getName(),
 							$rm->getName(),
 						));

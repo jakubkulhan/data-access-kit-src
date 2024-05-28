@@ -6,10 +6,21 @@ use DataAccessKit\DefaultNameConverter;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\CountBadParameterNameRepositoryInterface;
+use DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DelegateClassDoesNotExistRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DelegateMethodDoesNotExistRepositoryInterface;
+use DataAccessKit\Repository\Fixture\EmptyFileNameSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptFromRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleFromRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroUnknownRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptUnknownColumnRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsFromRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
@@ -31,6 +42,12 @@ use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroTableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnhandledMethodRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnknownVariableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeIntersectRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeMixedRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeObjectRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeUnionRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnusedVariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
@@ -54,20 +71,6 @@ class CompilerTest extends TestCase
 	protected function setUp(): void
 	{
 		$this->compiler = new Compiler(new Registry(new DefaultNameConverter()));
-	}
-
-	public function testCompileAcceptsOnlyInterface()
-	{
-		$this->expectException(CompilerException::class);
-		$this->expectExceptionMessage("must be an interface");
-		$this->compiler->compile($this->compiler->prepare(CompilerTest::class));
-	}
-
-	public function testCompileAcceptsOnlyInterfaceWithAttribute()
-	{
-		$this->expectException(CompilerException::class);
-		$this->expectExceptionMessage("must have a #[\\DataAccessKit\\Repository\\Attribute\\Repository] attribute");
-		$this->compiler->compile($this->compiler->prepare(NoAttributeInterface::class));
 	}
 
 	#[DataProvider("provideCompile")]
@@ -113,7 +116,7 @@ class CompilerTest extends TestCase
 	public function testCompileError(string $interfaceName): void
 	{
 		try {
-			$this->compiler->compile($this->compiler->prepare(UnusedVariableSQLRepositoryInterface::class));
+			$this->compiler->compile($this->compiler->prepare($interfaceName));
 		} catch (CompilerException $e) {
 			$this->assertMatchesSnapshot($e->getMessage());
 		}
@@ -122,7 +125,26 @@ class CompilerTest extends TestCase
 	public static function provideCompileError(): iterable
 	{
 		return static::provideRepositoryClasses([
+			CompilerTest::class,
+			NoAttributeInterface::class,
 			UnusedVariableSQLRepositoryInterface::class,
+			FindBadReturnTypeRepositoryInterface::class,
+			CountBadReturnTypeRepositoryInterface::class,
+			UnhandledMethodRepositoryInterface::class,
+			FindBadParameterNameRepositoryInterface::class,
+			CountBadParameterNameRepositoryInterface::class,
+			DelegateClassDoesNotExistRepositoryInterface::class,
+			DelegateMethodDoesNotExistRepositoryInterface::class,
+			FileDoesNotExistSQLFileRepositoryInterface::class,
+			EmptyFileNameSQLFileRepositoryInterface::class,
+			UnsupportedReturnTypeUnionRepositoryInterface::class,
+			UnsupportedReturnTypeIntersectRepositoryInterface::class,
+			UnsupportedReturnTypeMixedRepositoryInterface::class,
+			UnsupportedReturnTypeObjectRepositoryInterface::class,
+			UnknownVariableSQLRepositoryInterface::class,
+			MacroColumnsExceptUnknownColumnRepositoryInterface::class,
+			MacroColumnsExceptAllColumnRepositoryInterface::class,
+			MacroUnknownRepositoryInterface::class,
 		]);
 	}
 
