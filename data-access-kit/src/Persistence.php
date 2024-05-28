@@ -21,7 +21,7 @@ class Persistence implements PersistenceInterface
 	{
 	}
 
-	public function select(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable
+	public function select(string $className, string $sql, array $parameters = []): iterable
 	{
 		$table = $this->registry->get($className);
 

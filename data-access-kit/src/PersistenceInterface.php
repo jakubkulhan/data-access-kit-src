@@ -11,10 +11,9 @@ interface PersistenceInterface
 	 * @param class-string<T> $className
 	 * @param string $sql
 	 * @param array<int, mixed>|array<string, mixed> $parameters
-	 * @param array<int, mixed>|array<string, mixed> $parameterTypes
 	 * @return iterable<T>
 	 */
-	public function select(string $className, string $sql, array $parameters = [], array $parameterTypes = []): iterable;
+	public function select(string $className, string $sql, array $parameters = []): iterable;
 
 	/**
 	 * Insert $object into the database.
