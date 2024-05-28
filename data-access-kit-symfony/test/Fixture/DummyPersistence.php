@@ -17,6 +17,11 @@ class DummyPersistence implements PersistenceInterface
 		throw new LogicException("Not implemented");
 	}
 
+	public function execute(string $sql, array $parameters = []): int
+	{
+		throw new LogicException("Not implemented");
+	}
+
 	public function insert(object $object): void
 	{
 		throw new LogicException("Not implemented");

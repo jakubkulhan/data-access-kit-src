@@ -1,0 +1,19 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class VoidSQLRepository implements VoidSQLRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function deleteAll(): void
+	{
+		$this->persistence->execute('DELETE FROM foos', []);
+	}
+}

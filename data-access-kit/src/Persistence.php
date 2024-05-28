@@ -43,6 +43,11 @@ class Persistence implements PersistenceInterface
 		return $this->connection->executeQuery($sql, $parameters)->fetchOne();
 	}
 
+	public function execute(string $sql, array $parameters = []): int
+	{
+		return $this->connection->executeStatement($sql, $parameters);
+	}
+
 	public function insert(object $object): void
 	{
 		$this->insertUpsertAll([$object], []);

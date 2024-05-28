@@ -5,7 +5,7 @@ namespace DataAccessKit;
 interface PersistenceInterface
 {
 	/**
-	 * Run $sql with $parameters and return an iterable of objects of type $className.
+	 * Run SELECT $sql with $parameters and return an iterable of objects of type $className.
 	 *
 	 * @template T
 	 * @param class-string<T> $className
@@ -16,13 +16,22 @@ interface PersistenceInterface
 	public function select(string $className, string $sql, array $parameters = []): iterable;
 
 	/**
-	 * Run $sql with $parameters and return a scalar value.
+	 * Run SELECT $sql with $parameters and return a scalar value.
 	 *
 	 * @param string $sql
 	 * @param array $parameters
 	 * @return scalar
 	 */
 	public function selectScalar(string $sql, array $parameters = []): mixed;
+
+	/**
+	 * Run INSERT, UPDATE, or DELETE $sql with $parameters and return the number of affected rows.
+	 *
+	 * @param string $sql
+	 * @param array $parameters
+	 * @return int
+	 */
+	public function execute(string $sql, array $parameters = []): int;
 
 	/**
 	 * Insert $object into the database.

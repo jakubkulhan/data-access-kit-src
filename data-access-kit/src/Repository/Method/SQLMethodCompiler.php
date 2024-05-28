@@ -86,7 +86,10 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$method->line();
 		}
 
-		if ($returnType->isBuiltin() && !in_array($returnType->getName(), ["array", "iterable"], true)) {
+		if ($returnType->getName() === "void") {
+			$method->line("\$this->persistence->execute(" . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+
+		} else if ($returnType->isBuiltin() && !in_array($returnType->getName(), ["array", "iterable"], true)) {
 			if (!in_array($returnType->getName(), ["int", "float", "string", "bool"], true)) {
 				throw new CompilerException(sprintf(
 					"Method [%s::%s] has unsupported scalar return type [%s]. Please use int, float, string, or bool.",
