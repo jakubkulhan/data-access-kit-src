@@ -9,12 +9,12 @@ use DataAccessKit\Repository\Attribute\Find;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Attribute\SQLFile;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Method\CountMethodCompiler;
 use DataAccessKit\Repository\Method\DelegateMethodCompiler;
 use DataAccessKit\Repository\Method\FindMethodCompiler;
 use DataAccessKit\Repository\Method\SQLFileMethodCompiler;
 use DataAccessKit\Repository\Method\SQLMethodCompiler;
-use InvalidArgumentException;
 use LogicException;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -70,7 +70,7 @@ class Compiler
 		}
 
 		if (!$repositoryInterface->isInterface()) {
-			throw new InvalidArgumentException(sprintf(
+			throw new CompilerException(sprintf(
 				"The provided class name must be an interface, %s is not an interface.",
 				$repositoryInterface,
 			));
@@ -87,7 +87,7 @@ class Compiler
 			}
 		}
 		if ($repository === null) {
-			throw new InvalidArgumentException(sprintf(
+			throw new CompilerException(sprintf(
 				"The provided interface must have a #[\\%s] attribute.",
 				Repository::class,
 			));
@@ -128,7 +128,7 @@ class Compiler
 			foreach ($rm->getAttributes() as $ra) {
 				if (isset($this->methodCompilers[$ra->getName()])) {
 					if ($methodCompiler !== null) {
-						throw new LogicException(sprintf(
+						throw new CompilerException(sprintf(
 							"Method [%s::%s] has multiple method compiler attributes. Only one method compiler is allowed per method.",
 							$result->reflection->getName(),
 							$rm->getName(),
@@ -146,7 +146,7 @@ class Compiler
 				if (in_array($words[0], ["get", "find"], true)) {
 					$returnType = $rm->getReturnType();
 					if (!$returnType instanceof ReflectionNamedType || !in_array($returnType->getName(), ["array", "iterable", $result->repository->class], true)) {
-						throw new LogicException(sprintf(
+						throw new CompilerException(sprintf(
 							"Method [%s::%s] must return array, iterable, or [%s] to able to be generated. Either change the return type, add an attribute, or remove the method.",
 							$result->reflection->getName(),
 							$rm->getName(),
@@ -160,7 +160,7 @@ class Compiler
 				} else if (in_array($words[0], ["count"], true)) {
 					$returnType = $rm->getReturnType();
 					if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== "int") {
-						throw new LogicException(sprintf(
+						throw new CompilerException(sprintf(
 							"Method [%s::%s] must return int to able to be generated. Either change the return type, add an attribute, or remove the method.",
 							$result->reflection->getName(),
 							$rm->getName(),
@@ -171,7 +171,7 @@ class Compiler
 					$methodCompilerAttribute = new Count();
 
 				} else {
-					throw new LogicException(sprintf(
+					throw new CompilerException(sprintf(
 						"Doesn't know how to generate method [%s::%s]. Either change the method, add an attribute, or remove the method.",
 						$result->reflection->getName(),
 						$rm->getName(),

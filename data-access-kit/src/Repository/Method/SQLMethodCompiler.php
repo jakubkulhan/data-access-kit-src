@@ -6,12 +6,11 @@ use DataAccessKit\Attribute\Column;
 use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Compiler;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
-use LogicException;
 use ReflectionNamedType;
-use function assert;
 use function implode;
 use function in_array;
 use function preg_replace_callback;
@@ -45,7 +44,13 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		}
 
 		$returnType = $method->reflection->getReturnType();
-		assert($returnType instanceof ReflectionNamedType);
+		if (!$returnType instanceof ReflectionNamedType) {
+			throw new CompilerException(sprintf(
+				"Method [%s::%s] has unsupported return type. Please provide named return type (scalar, array, iterable, or class name).",
+				$result->reflection->getName(),
+				$method->reflection->getName(),
+			));
+		}
 
 		if (in_array($returnType->getName(), ["iterable", "array"], true)) {
 			if ($attribute->itemType === null) {
@@ -68,8 +73,8 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		$sql = preg_replace_callback('/@([a-zA-Z0-9_]+)/', static function ($m) use ($result, $method, $reflectionParametersByName, &$sqlParameters) {
 			$name = $m[1];
 			if (!isset($reflectionParametersByName[$name])) {
-				throw new LogicException(sprintf(
-					"SQL for method [%s:%s] contains variable @%s, but method does not have parameter with this name.",
+				throw new CompilerException(sprintf(
+					"SQL for method [%s::%s] contains variable @%s, but method does not have parameter with this name.",
 					$result->reflection->getName(),
 					$method->reflection->getName(),
 					$name,

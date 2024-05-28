@@ -5,9 +5,9 @@ namespace DataAccessKit\Repository\Method;
 use DataAccessKit\Attribute\Table;
 use DataAccessKit\Repository\Attribute\Count;
 use DataAccessKit\Repository\Attribute\Find;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
-use LogicException;
 use function implode;
 use function sprintf;
 
@@ -25,7 +25,7 @@ trait BuildWhereTrait
 				}
 			}
 			if ($column === null) {
-				throw new LogicException(sprintf(
+				throw new CompilerException(sprintf(
 					"Method [%s::%s] parameter [%s] does not match any property of [%s], and therefore cannot be used as a query condition.",
 					$result->reflection->getName(),
 					$method->reflection->getName(),

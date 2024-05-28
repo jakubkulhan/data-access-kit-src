@@ -4,17 +4,16 @@ namespace DataAccessKit\Repository\Method;
 
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Attribute\SQLFile;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
-use LogicException;
 use function dirname;
 use function file_get_contents;
 use function preg_match;
 use function preg_quote;
 use function rtrim;
 use function sprintf;
-use function var_dump;
 use const DIRECTORY_SEPARATOR;
 
 /**
@@ -32,8 +31,8 @@ class SQLFileMethodCompiler implements MethodCompilerInterface
 	{
 		$file = $attribute->file;
 		if ($file === "") {
-			throw new LogicException(sprintf(
-				"SQL file for method [%s:%s] is blank, please specify a file path.",
+			throw new CompilerException(sprintf(
+				"SQL file for method [%s::%s] is blank, please specify a file path.",
 				$result->reflection->getName(),
 				$method->reflection->getName(),
 			));
@@ -45,8 +44,8 @@ class SQLFileMethodCompiler implements MethodCompilerInterface
 
 		$contents = file_get_contents($file);
 		if ($contents === false) {
-			throw new LogicException(sprintf(
-				"SQL file for method [%s:%s] does not exist or is not readable.",
+			throw new CompilerException(sprintf(
+				"SQL file for method [%s::%s] does not exist or is not readable.",
 				$result->reflection->getName(),
 				$method->reflection->getName(),
 			));

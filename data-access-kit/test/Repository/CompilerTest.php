@@ -4,6 +4,8 @@ namespace DataAccessKit\Repository;
 
 use DataAccessKit\DefaultNameConverter;
 use DataAccessKit\Registry;
+use DataAccessKit\Repository\Exception\CompilerException;
+use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToInterfaceRepositoryInterface;
@@ -21,9 +23,7 @@ use DataAccessKit\Repository\Fixture\SimpleSQLArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
-use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -48,14 +48,14 @@ class CompilerTest extends TestCase
 
 	public function testCompileAcceptsOnlyInterface()
 	{
-		$this->expectException(InvalidArgumentException::class);
+		$this->expectException(CompilerException::class);
 		$this->expectExceptionMessage("must be an interface");
 		$this->compiler->compile($this->compiler->prepare(CompilerTest::class));
 	}
 
 	public function testCompileAcceptsOnlyInterfaceWithAttribute()
 	{
-		$this->expectException(InvalidArgumentException::class);
+		$this->expectException(CompilerException::class);
 		$this->expectExceptionMessage("must have a #[\\DataAccessKit\\Repository\\Attribute\\Repository] attribute");
 		$this->compiler->compile($this->compiler->prepare(NoAttributeInterface::class));
 	}
