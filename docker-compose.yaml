@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:latest
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "1"
+      MYSQL_DATABASE: "DataAccessKit"
+    ports:
+      - 32016:3306
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 30s
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "1"
+      MARIADB_DATABASE: "DataAccessKit"
+    ports:
+      - 35098:3306
+    tmpfs:
+      - /var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 30s
+  postgres:
+    image: postgres:latest
+    shm_size: 128MB
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "DataAccessKit"
+    ports:
+      - 55720:5432
+    tmpfs:
+      - /var/lib/postgresql
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 30s
+  sqlite:
+    image: busybox
+    command:
+      - tail
+      - -f
+      - /dev/null
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 1s
+      timeout: 1s
+      retries: 30
+      start_period: 30s

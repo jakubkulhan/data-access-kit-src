@@ -1,6 +1,6 @@
 on: [push]
 jobs:
-  test:
+  test-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -8,4 +8,36 @@ jobs:
         with:
           php-version: '8.3'
       - uses: php-actions/composer@v6
-      - run: ./vendor/bin/phpunit
+      - run: ./vendor/bin/phpunit --group unit
+
+  test-database:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+        - service: mysql
+          database_url: pdo-mysql://root@127.0.0.1:32016/DataAccessKit
+        - service: mariadb
+          database_url: pdo-mysql://root@127.0.0.1:35098/DataAccessKit
+        - service: postgres
+          database_url: pdo-pgsql://postgres:postgres@127.0.0.1:55720/DataAccessKit
+        - service: sqlite
+          database_url: "pdo-sqlite:///:memory:"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: adambirds/docker-compose-action@v1.3.0
+        with:
+          compose-file: docker-compose.yaml
+          services: ${{ matrix.database.service }}
+      - uses: stringbean/docker-healthcheck-action@v1
+        with:
+          container: data-access-kit-src_${{ matrix.database.service }}_1
+          wait-time: 30
+          require-status: running
+          require-healthy: true
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - uses: php-actions/composer@v6
+      - run: DATABASE_URL=${{ matrix.database.database_url }} ./vendor/bin/phpunit --group database
