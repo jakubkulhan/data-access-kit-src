@@ -6,10 +6,8 @@
          failOnNotice="true"
          displayDetailsOnTestsThatTriggerNotices="true">
     <testsuites>
-        <testsuite name="data-access-kit">
+        <testsuite name="test">
             <directory>data-access-kit/test</directory>
-        </testsuite>
-        <testsuite name="data-access-kit-symfony">
             <directory>data-access-kit-symfony/test</directory>
         </testsuite>
     </testsuites>

@@ -72,6 +72,7 @@ use DataAccessKit\Repository\Fixture\UpsertTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Spatie\Snapshots\MatchesSnapshots;
@@ -82,6 +83,7 @@ use function str_replace;
 use function strrpos;
 use function substr;
 
+#[Group("unit")]
 class CompilerTest extends TestCase
 {
 
@@ -95,7 +97,7 @@ class CompilerTest extends TestCase
 	}
 
 	#[DataProvider("provideCompile")]
-	public function testCompile(string $interfaceName)
+	public function testCompileSuccess(string $interfaceName)
 	{
 		$this->assertMatchesSnapshot((string) $this->compiler->compile($this->compiler->prepare($interfaceName)));
 	}

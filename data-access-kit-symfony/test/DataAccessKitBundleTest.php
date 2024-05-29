@@ -7,6 +7,7 @@ use DataAccessKit\Symfony\Fixture\DummyPersistence;
 use DataAccessKit\Symfony\Fixture\FooRepository;
 use DataAccessKit\Symfony\Fixture\FooRepositoryInterface;
 use DataAccessKit\Symfony\Fixture\FooService;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Symfony\Component\Config\Loader\LoaderInterface;
@@ -18,6 +19,7 @@ use function bin2hex;
 use function class_exists;
 use function random_bytes;
 
+#[Group("unit")]
 class DataAccessKitBundleTest extends TestCase
 {
 
