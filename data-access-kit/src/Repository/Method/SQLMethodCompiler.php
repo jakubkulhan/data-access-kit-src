@@ -162,7 +162,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<columns>columns\b(?:\(\s*
 					(?:except\s+(?P<columnsExcept>[a-zA-Z0-9_]+(?:\s*,\s*[a-zA-Z0-9_]+)*)\s*)?
-					(?:from\s+(?P<columnsFrom>[a-zA-Z0-9_]+)\s*)?
+					(?:alias\s+(?P<columnsAlias>[a-zA-Z0-9_]+)\s*)?
 				\))?)
 				|
 				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
@@ -215,8 +215,8 @@ class SQLMethodCompiler implements MethodCompilerInterface
 						}
 					}
 
-					if (!empty($m["columnsFrom"])) {
-						$columnNames = array_map(fn(string $it) => $m["columnsFrom"] . "." . $it, $columnNames);
+					if (!empty($m["columnsAlias"])) {
+						$columnNames = array_map(fn(string $it) => $m["columnsAlias"] . "." . $it, $columnNames);
 					}
 
 					return implode(", ", $columnNames);

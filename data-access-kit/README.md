@@ -124,7 +124,7 @@ A single entity return type must be the class the repository is for. If the retu
 
 ```php
 #[Find(
-    select: "%columns(alias: u, except: password)", // optional, default is all columns specified by Column attributes
+    select: "%columns(except password alias u)", // optional, default is all columns specified by Column attributes
     from: "users", // optional, default is the table the repository is for
     alias: "u", // optional, default is "t"
     where: "u.id = @id", // optional, default is AND of all equality conditions based on parameter names and arguments
@@ -188,9 +188,9 @@ Array parameters are expanded to a list of placeholders. For example, if you hav
 There are also several macros that expand to SQL fragments.
 
 - `%columns` - expands to all columns specified by Column attributes.
-  - `%columns(from u)` - expands to all columns specified by Column attributes prefixed by the alias.
+  - `%columns(alias u)` - expands to all columns specified by Column attributes prefixed by the alias.
   - `%columns(except password)` - expands to all columns specified by Column attributes except the specified columns.
-  - `%columns(except password, long_description from u)` - combination of the previous two.
+  - `%columns(except password, long_description alias u)` - combination of the previous two.
 - `%table` - expands to the table name.
 
 ### SQLFile

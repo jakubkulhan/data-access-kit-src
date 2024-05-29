@@ -15,13 +15,13 @@ use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroColumnsExceptFromRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleFromRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptAliasRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroUnknownRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptUnknownColumnRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroColumnsFromRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
@@ -101,9 +101,9 @@ class CompilerTest extends TestCase
 			MacroColumnsRepositoryInterface::class,
 			MacroColumnsExceptRepositoryInterface::class,
 			MacroColumnsExceptMultipleRepositoryInterface::class,
-			MacroColumnsFromRepositoryInterface::class,
-			MacroColumnsExceptFromRepositoryInterface::class,
-			MacroColumnsExceptMultipleFromRepositoryInterface::class,
+			MacroColumnsAliasRepositoryInterface::class,
+			MacroColumnsExceptAliasRepositoryInterface::class,
+			MacroColumnsExceptMultipleAliasRepositoryInterface::class,
 			AbsoluteSQLFileRepositoryInterface::class,
 			RelativeSQLFileRepositoryInterface::class,
 			DelegateToClassRepositoryInterface::class,

@@ -6,8 +6,8 @@ use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 
 #[Repository(Foo::class)]
-interface MacroColumnsExceptFromRepositoryInterface
+interface MacroColumnsAliasRepositoryInterface
 {
-	#[SQL("SELECT %columns(except description from f) FROM foos f")]
-	public function allColumnsExceptFrom(): iterable;
+	#[SQL("SELECT %columns(alias f) FROM foos f")]
+	public function allColumnsAlias(): iterable;
 }

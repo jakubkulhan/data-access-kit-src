@@ -4,7 +4,7 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\PersistenceInterface;
 
-final class MacroColumnsFromRepository implements MacroColumnsFromRepositoryInterface
+final class MacroColumnsAliasRepository implements MacroColumnsAliasRepositoryInterface
 {
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
@@ -12,7 +12,7 @@ final class MacroColumnsFromRepository implements MacroColumnsFromRepositoryInte
 	{
 	}
 
-	public function allColumnsFrom(): iterable
+	public function allColumnsAlias(): iterable
 	{
 		$result = $this->persistence->select(Foo::class, 'SELECT f.id, f.title, f.description FROM foos f', []);
 

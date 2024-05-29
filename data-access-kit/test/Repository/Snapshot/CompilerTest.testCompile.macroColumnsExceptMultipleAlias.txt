@@ -4,7 +4,7 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\PersistenceInterface;
 
-final class MacroColumnsExceptMultipleFromRepository implements MacroColumnsExceptMultipleFromRepositoryInterface
+final class MacroColumnsExceptMultipleAliasRepository implements MacroColumnsExceptMultipleAliasRepositoryInterface
 {
 	public function __construct(
 		private readonly PersistenceInterface $persistence,
@@ -12,7 +12,7 @@ final class MacroColumnsExceptMultipleFromRepository implements MacroColumnsExce
 	{
 	}
 
-	public function allColumnsExceptMultipleFrom(): iterable
+	public function allColumnsExceptMultipleAlias(): iterable
 	{
 		$result = $this->persistence->select(Foo::class, 'SELECT f.id FROM foos f', []);
 
