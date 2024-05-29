@@ -194,20 +194,18 @@ class CompilerTest extends TestCase
 	{
 		foreach ($classes as $class) {
 			$p = strrpos($class, "\\");
-			yield lcfirst(str_replace("RepositoryInterface", "", substr($class, $p + 1))) => [$class];
+			yield str_replace("Interface", "", substr($class, $p + 1)) => [$class];
 		}
 	}
 
 	protected function getSnapshotDirectory(): string
 	{
-		return dirname((new ReflectionClass($this))->getFileName()) . "/Snapshot";
+		return dirname((new ReflectionClass($this))->getFileName()) . "/Fixture";
 	}
 
 	protected function getSnapshotId(): string
 	{
-		return (new ReflectionClass($this))->getShortName() . '.' .
-			$this->name() . '.' .
-			$this->dataName();
+		return $this->dataName() . '.snapshot';
 	}
 
 }
