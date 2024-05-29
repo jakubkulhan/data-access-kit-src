@@ -240,19 +240,6 @@ class Persistence implements PersistenceInterface
 		);
 	}
 
-	public function transactional(callable $callback): mixed
-	{
-		try {
-			$this->connection->beginTransaction();
-			$result = $callback();
-			$this->connection->commit();
-			return $result;
-		} catch (\Throwable $e) {
-			$this->connection->rollBack();
-			throw $e;
-		}
-	}
-
 	public function toRow(object $object): array
 	{
 		$table = $this->registry->get($object);

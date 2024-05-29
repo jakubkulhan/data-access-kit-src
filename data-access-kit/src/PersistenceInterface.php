@@ -78,15 +78,6 @@ interface PersistenceInterface
 	public function deleteAll(array $objects): void;
 
 	/**
-	 * Run $callback in a transaction.
-	 *
-	 * @template T
-	 * @param callable(): T $callback
-	 * @return T
-	 */
-	public function transactional(callable $callback): mixed;
-
-	/**
 	 * Convert $object to an associative array.
 	 *
 	 * @param object $object
