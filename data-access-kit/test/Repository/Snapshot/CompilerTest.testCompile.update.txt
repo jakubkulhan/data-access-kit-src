@@ -18,4 +18,11 @@ final class UpdateRepository implements UpdateRepositoryInterface
 	{
 		$this->persistence->update($foo);
 	}
+
+	public function updateTitleOnly(
+		Foo $foo,
+	): void
+	{
+		$this->persistence->update($foo, ['title']);
+	}
 }

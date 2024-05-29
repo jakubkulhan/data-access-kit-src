@@ -2,7 +2,9 @@
 
 namespace DataAccessKit\Repository\Method;
 
+use DataAccessKit\Repository\Attribute\Delete;
 use DataAccessKit\Repository\Attribute\Insert;
+use DataAccessKit\Repository\Attribute\Update;
 use DataAccessKit\Repository\Attribute\Upsert;
 use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Repository\Exception\CompilerException;
@@ -11,13 +13,12 @@ use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
 use ReflectionNamedType;
 use function get_class;
-use function in_array;
 use function property_exists;
 use function sprintf;
 use function ucfirst;
 
 /**
- * @implements MethodCompilerInterface<Insert|Upsert>
+ * @implements MethodCompilerInterface<Insert|Upsert|Update|Delete>
  */
 class ManipulationMethodCompiler implements MethodCompilerInterface
 {
@@ -28,6 +29,8 @@ class ManipulationMethodCompiler implements MethodCompilerInterface
 		$persistenceMethod = match (true) {
 			$attribute instanceof Insert => "insert",
 			$attribute instanceof Upsert => "upsert",
+			$attribute instanceof Update => "update",
+			$attribute instanceof Delete => "delete",
 			default => throw new CompilerException(sprintf(
 				"Unexpected attribute of type [%s].",
 				get_class($attribute),
@@ -53,13 +56,19 @@ class ManipulationMethodCompiler implements MethodCompilerInterface
 		}
 
 		$rp = $method->reflection->getParameters()[0];
-		if (!$rp->getType() instanceof ReflectionNamedType || !in_array($rp->getType()->getName(), ["array", $result->repository->class], true)) {
+		if (!$rp->getType() instanceof ReflectionNamedType ||
+			!(
+				$rp->getType()->getName() === $result->repository->class ||
+				($rp->getType()->getName() === "array" && !$attribute instanceof Update)
+			)
+		) {
 			throw new CompilerException(sprintf(
-				"%s method [%s::%s] must have exactly one parameter with type [%s] or array.",
+				"%s method [%s::%s] must have exactly one parameter with type [%s]%s.",
 				ucfirst($persistenceMethod),
 				$result->reflection->getName(),
 				$method->reflection->getName(),
 				$result->repository->class,
+				$attribute instanceof Update ? "" : " or array",
 			));
 		}
 

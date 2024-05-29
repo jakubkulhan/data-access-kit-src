@@ -74,6 +74,7 @@ use ReflectionClass;
 use Spatie\Snapshots\MatchesSnapshots;
 use function dirname;
 use function lcfirst;
+use function sprintf;
 use function str_replace;
 use function strrpos;
 use function substr;
@@ -138,6 +139,7 @@ class CompilerTest extends TestCase
 	{
 		try {
 			$this->compiler->compile($this->compiler->prepare($interfaceName));
+			$this->fail(sprintf("Expected [%s] to be thrown.", CompilerException::class));
 		} catch (CompilerException $e) {
 			$this->assertMatchesSnapshot($e->getMessage());
 		}

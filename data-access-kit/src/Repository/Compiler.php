@@ -59,8 +59,8 @@ class Compiler
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
 		$this->registerMethodCompiler(Insert::class, $manipulationMethodCompiler = new ManipulationMethodCompiler());
 		$this->registerMethodCompiler(Upsert::class, $manipulationMethodCompiler);
-		$this->registerMethodCompiler(Update::class, new UpdateMethodCompiler());
-		$this->registerMethodCompiler(Delete::class, new DeleteMethodCompiler());
+		$this->registerMethodCompiler(Update::class, $manipulationMethodCompiler);
+		$this->registerMethodCompiler(Delete::class, $manipulationMethodCompiler);
 	}
 
 	/**
