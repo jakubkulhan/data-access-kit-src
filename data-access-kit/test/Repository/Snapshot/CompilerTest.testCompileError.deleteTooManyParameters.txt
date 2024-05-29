@@ -1,0 +1,1 @@
+Delete method [DataAccessKit\Repository\Fixture\DeleteTooManyParametersRepositoryInterface::deleteTwo] must have exactly one parameter.

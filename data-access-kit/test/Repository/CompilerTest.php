@@ -10,6 +10,10 @@ use DataAccessKit\Repository\Fixture\CountBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateClassDoesNotExistRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateMethodDoesNotExistRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DeleteBadParameterTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DeleteRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DeleteReturnTypeNonVoidRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DeleteTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\EmptyFileNameSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
@@ -119,6 +123,7 @@ class CompilerTest extends TestCase
 			DelegateToTraitRepositoryInterface::class,
 			InsertRepositoryInterface::class,
 			UpdateRepositoryInterface::class,
+			DeleteRepositoryInterface::class,
 		]);
 	}
 
@@ -161,6 +166,9 @@ class CompilerTest extends TestCase
 			UpdateReturnTypeNonVoidRepositoryInterface::class,
 			UpdateTooManyParametersRepositoryInterface::class,
 			UpdateBadParameterTypeRepositoryInterface::class,
+			DeleteReturnTypeNonVoidRepositoryInterface::class,
+			DeleteTooManyParametersRepositoryInterface::class,
+			DeleteBadParameterTypeRepositoryInterface::class,
 		]);
 	}
 

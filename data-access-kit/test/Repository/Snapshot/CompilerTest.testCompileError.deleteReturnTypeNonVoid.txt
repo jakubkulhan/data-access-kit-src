@@ -1,0 +1,1 @@
+Delete method [DataAccessKit\Repository\Fixture\DeleteReturnTypeNonVoidRepositoryInterface::delete] must have void return type.

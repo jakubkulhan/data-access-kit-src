@@ -5,6 +5,7 @@ namespace DataAccessKit\Repository;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Count;
 use DataAccessKit\Repository\Attribute\Delegate;
+use DataAccessKit\Repository\Attribute\Delete;
 use DataAccessKit\Repository\Attribute\Find;
 use DataAccessKit\Repository\Attribute\Insert;
 use DataAccessKit\Repository\Attribute\Repository;
@@ -14,6 +15,7 @@ use DataAccessKit\Repository\Attribute\Update;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Method\CountMethodCompiler;
 use DataAccessKit\Repository\Method\DelegateMethodCompiler;
+use DataAccessKit\Repository\Method\DeleteMethodCompiler;
 use DataAccessKit\Repository\Method\FindMethodCompiler;
 use DataAccessKit\Repository\Method\InsertMethodCompiler;
 use DataAccessKit\Repository\Method\SQLFileMethodCompiler;
@@ -56,6 +58,7 @@ class Compiler
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
 		$this->registerMethodCompiler(Insert::class, new InsertMethodCompiler());
 		$this->registerMethodCompiler(Update::class, new UpdateMethodCompiler());
+		$this->registerMethodCompiler(Delete::class, new DeleteMethodCompiler());
 	}
 
 	/**
@@ -164,6 +167,10 @@ class Compiler
 				} else if ($words[0] === "update") {
 					$methodCompiler = $this->methodCompilers[Update::class];
 					$methodCompilerAttribute = new Update();
+
+				} else if ($words[0] === "delete") {
+					$methodCompiler = $this->methodCompilers[Delete::class];
+					$methodCompilerAttribute = new Delete();
 
 				} else {
 					throw new CompilerException(sprintf(

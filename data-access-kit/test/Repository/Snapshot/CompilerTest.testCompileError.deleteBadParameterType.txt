@@ -1,0 +1,1 @@
+Delete method [DataAccessKit\Repository\Fixture\DeleteBadParameterTypeRepositoryInterface::delete] must have exactly one parameter with type [DataAccessKit\Repository\Fixture\Foo] or array.

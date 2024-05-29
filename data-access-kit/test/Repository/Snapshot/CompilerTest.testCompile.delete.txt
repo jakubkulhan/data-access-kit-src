@@ -1,0 +1,28 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class DeleteRepository implements DeleteRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function delete(
+		Foo $foo,
+	): void
+	{
+		$this->persistence->delete($foo);
+	}
+
+	public function deleteAll(
+		array $foos,
+	): void
+	{
+		$this->persistence->deleteAll($foos);
+	}
+}
