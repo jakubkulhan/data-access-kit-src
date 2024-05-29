@@ -1,0 +1,1 @@
+Upsert method [DataAccessKit\Repository\Fixture\UpsertBadParameterTypeRepositoryInterface::upsert] must have exactly one parameter with type [DataAccessKit\Repository\Fixture\Foo] or array.

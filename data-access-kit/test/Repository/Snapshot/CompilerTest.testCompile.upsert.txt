@@ -1,0 +1,35 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class UpsertRepository implements UpsertRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function upsert(
+		Foo $foo,
+	): void
+	{
+		$this->persistence->upsert($foo);
+	}
+
+	public function upsertAll(
+		array $foos,
+	): void
+	{
+		$this->persistence->upsertAll($foos);
+	}
+
+	public function upsertTitleOnly(
+		array $foos,
+	): void
+	{
+		$this->persistence->upsertAll($foos, ['title']);
+	}
+}

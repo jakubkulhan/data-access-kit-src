@@ -8,37 +8,38 @@ use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateClassDoesNotExistRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DelegateMethodDoesNotExistRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DelegateToInterfaceRepositoryInterface;
+use DataAccessKit\Repository\Fixture\DelegateToTraitRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DeleteBadParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DeleteRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DeleteReturnTypeNonVoidRepositoryInterface;
 use DataAccessKit\Repository\Fixture\DeleteTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\EmptyFileNameSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\EmptyRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FindArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FindIterableRepositoryInterface;
+use DataAccessKit\Repository\Fixture\GetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertBadParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertReturnTypeNonVoidRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertTooManyParametersRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptAliasRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroUnknownRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptUnknownColumnRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroColumnsAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsRepositoryInterface;
-use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
-use DataAccessKit\Repository\Fixture\DelegateToClassRepositoryInterface;
-use DataAccessKit\Repository\Fixture\DelegateToInterfaceRepositoryInterface;
-use DataAccessKit\Repository\Fixture\DelegateToTraitRepositoryInterface;
-use DataAccessKit\Repository\Fixture\EmptyRepositoryInterface;
-use DataAccessKit\Repository\Fixture\FindArrayRepositoryInterface;
-use DataAccessKit\Repository\Fixture\FindIterableRepositoryInterface;
-use DataAccessKit\Repository\Fixture\GetRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroTableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\MacroUnknownRepositoryInterface;
 use DataAccessKit\Repository\Fixture\NoAttributeInterface;
 use DataAccessKit\Repository\Fixture\NullableGetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\NullableScalarSQLRepositoryInterface;
@@ -49,7 +50,6 @@ use DataAccessKit\Repository\Fixture\SimpleSQLArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLNullableObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\SimpleSQLObjectRepositoryInterface;
-use DataAccessKit\Repository\Fixture\MacroTableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnhandledMethodRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnknownVariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeIntersectRepositoryInterface;
@@ -57,10 +57,15 @@ use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeMixedRepositoryInterfa
 use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeUnionRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnusedVariableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpdateArrayParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpdateBadParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpdateRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpdateReturnTypeNonVoidRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpdateTooManyParametersRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpsertBadParameterTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpsertRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpsertReturnTypeNonVoidRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpsertTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -122,6 +127,7 @@ class CompilerTest extends TestCase
 			DelegateToInterfaceRepositoryInterface::class,
 			DelegateToTraitRepositoryInterface::class,
 			InsertRepositoryInterface::class,
+			UpsertRepositoryInterface::class,
 			UpdateRepositoryInterface::class,
 			DeleteRepositoryInterface::class,
 		]);
@@ -163,9 +169,13 @@ class CompilerTest extends TestCase
 			InsertReturnTypeNonVoidRepositoryInterface::class,
 			InsertTooManyParametersRepositoryInterface::class,
 			InsertBadParameterTypeRepositoryInterface::class,
+			UpsertReturnTypeNonVoidRepositoryInterface::class,
+			UpsertTooManyParametersRepositoryInterface::class,
+			UpsertBadParameterTypeRepositoryInterface::class,
 			UpdateReturnTypeNonVoidRepositoryInterface::class,
 			UpdateTooManyParametersRepositoryInterface::class,
 			UpdateBadParameterTypeRepositoryInterface::class,
+			UpdateArrayParameterTypeRepositoryInterface::class,
 			DeleteReturnTypeNonVoidRepositoryInterface::class,
 			DeleteTooManyParametersRepositoryInterface::class,
 			DeleteBadParameterTypeRepositoryInterface::class,
