@@ -118,4 +118,19 @@ class PersistenceTest extends TestCase
 		}
 	}
 
+	public function testUpsert(): void
+	{
+		$this->setUpUsersTable();
+		$user = new User();
+		$user->id = 1;
+		$user->firstName = "Charlie";
+		$this->persistence->upsert($user);
+		$this->assertEquals(1, $user->id);
+
+		$users = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name FROM users WHERE user_id = ?", [$user->id]));
+		$this->assertCount(1, $users);
+		$this->assertEquals($user->id, $users[0]->id);
+		$this->assertEquals($user->firstName, $users[0]->firstName);
+	}
+
 }

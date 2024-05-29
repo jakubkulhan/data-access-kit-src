@@ -4,10 +4,12 @@ namespace DataAccessKit;
 
 use DataAccessKit\Attribute\Column;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
 use LogicException;
+use function array_map;
 use function array_merge;
 use function count;
 use function implode;
@@ -84,10 +86,11 @@ class Persistence implements PersistenceInterface
 		$columnNames = [];
 		$rows = [];
 		$values = [];
-		$update = [];
+		$updateColumnNames = [];
 		$generatedColumnNames = [];
 		/** @var Column[] $generatedColumns */
 		$generatedColumns = [];
+		$primaryKeyColumnNames = [];
 		/** @var Column|null $primaryKeyColumn */
 		$primaryKeyColumn = null;
 		$supportsReturning = match (true) {
@@ -96,34 +99,49 @@ class Persistence implements PersistenceInterface
 			$platform instanceof SQLitePlatform => true,
 			default => false,
 		};
+		$supportsDefault = match (true) {
+			$platform instanceof AbstractMySQLPlatform => true,
+			$platform instanceof PostgreSQLPlatform => true,
+			default => false,
+		};
 
 		foreach ($table->columns as $column) {
-			if ($column->generated) {
-				if ($column->primary) {
-					if ($primaryKeyColumn !== null) {
-						throw new LogicException("Multiple generated primary columns.");
-					}
-					$primaryKeyColumn = $column;
+			if ($column->primary) {
+				if ($upsertColumns !== []) {
+					$columnNames[] = $platform->quoteSingleIdentifier($column->name);
+				}
+				$primaryKeyColumnNames[] = $platform->quoteSingleIdentifier($column->name);
+
+				if ($primaryKeyColumn !== null) {
+					throw new LogicException("Multiple generated primary columns.");
+				}
+				$primaryKeyColumn = $column;
+
+				if ($column->generated && $supportsReturning) {
+					$generatedColumnNames[] = $platform->quoteSingleIdentifier($column->name);
+					$generatedColumns[] = $column;
 				}
 
+			} else if ($column->generated) {
 				if ($supportsReturning) {
 					$generatedColumnNames[] = $platform->quoteSingleIdentifier($column->name);
 					$generatedColumns[] = $column;
 				}
+
 			} else {
 				$columnNames[] = $platform->quoteSingleIdentifier($column->name);
 
 				if ($upsertColumns === null || in_array($column->name, $upsertColumns, true)) {
-					$update[] = $platform->quoteSingleIdentifier($column->name) . " = VALUES(" . $platform->quoteSingleIdentifier($column->name) . ")";
+					$updateColumnNames[] = $platform->quoteSingleIdentifier($column->name);
 				}
 			}
 		}
 
-		foreach ($objects as $object) {
+		foreach ($objects as $index => $object) {
 			$row = [];
 
 			foreach ($table->columns as $column) {
-				if ($column->generated) {
+				if ($column->generated && !($column->primary && $upsertColumns !== [])) {
 					continue;
 				}
 
@@ -133,8 +151,15 @@ class Persistence implements PersistenceInterface
 					$row[] = "?";
 					$values[] = $value;
 
-				} else {
+				} else if ($supportsDefault && $upsertColumns === []) {
 					$row[] = "DEFAULT";
+
+				} else {
+					throw new LogicException(sprintf(
+						"Property [%s] of object at index [%d] not initialized.",
+						$column->reflection->getName(),
+						$index,
+					));
 				}
 			}
 
@@ -146,17 +171,22 @@ class Persistence implements PersistenceInterface
 			$platform->quoteSingleIdentifier($table->name),
 			implode(", ", $columnNames),
 			implode(", ", $rows),
-			match (count($update)) {
-				0 => "",
-				default => sprintf(" ON DUPLICATE KEY UPDATE %s", implode(", ", $update)),
+			match (true) {
+				count($updateColumnNames) > 0 && $platform instanceof AbstractMySQLPlatform => sprintf(" ON DUPLICATE KEY UPDATE %s", implode(", ", array_map(fn(string $it) => $it . " = VALUES(" . $it . ")", $updateColumnNames))),
+				count($updateColumnNames) > 0 && ($platform instanceof PostgreSQLPlatform || $platform instanceof SQLitePlatform) => sprintf(" ON CONFLICT (%s) DO UPDATE SET %s", implode(", ", $primaryKeyColumnNames), implode(", ", array_map(fn(string $it) => $it . " = EXCLUDED." . $it, $updateColumnNames))),
+				count($updateColumnNames) > 0 => throw new LogicException(sprintf(
+					"Upsert not supported on platform [%s].",
+					get_class($platform),
+				)),
+				default => "",
 			},
 			match ($supportsReturning) {
 				true => sprintf(" RETURNING %s", implode(", ", $generatedColumnNames)),
 				default => "",
 			},
 		);
-
 		$result = $this->connection->executeQuery($sql, $values);
+
 		if ($supportsReturning && count($generatedColumns) > 0) {
 			foreach ($result->iterateAssociative() as $index => $row) {
 				$object = $objects[$index];
