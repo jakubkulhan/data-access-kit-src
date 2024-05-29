@@ -2,7 +2,11 @@
 
 namespace DataAccessKit;
 
+use DataAccessKit\Attribute\Column;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\MariaDBPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Platforms\SQLitePlatform;
 use LogicException;
 use function array_merge;
 use function count;
@@ -77,27 +81,41 @@ class Persistence implements PersistenceInterface
 		$table = $this->registry->get($objects[0], true);
 		$platform = $this->connection->getDatabasePlatform();
 
-		$columns = [];
+		$columnNames = [];
 		$rows = [];
 		$values = [];
 		$update = [];
-		$primaryKey = null;
+		$generatedColumnNames = [];
+		/** @var Column[] $generatedColumns */
+		$generatedColumns = [];
+		/** @var Column|null $primaryKeyColumn */
+		$primaryKeyColumn = null;
+		$supportsReturning = match (true) {
+			$platform instanceof MariaDBPlatform => true,
+			$platform instanceof PostgreSQLPlatform => true,
+			$platform instanceof SQLitePlatform => true,
+			default => false,
+		};
 
 		foreach ($table->columns as $column) {
 			if ($column->generated) {
 				if ($column->primary) {
-					if ($primaryKey !== null) {
+					if ($primaryKeyColumn !== null) {
 						throw new LogicException("Multiple generated primary columns.");
 					}
-					$primaryKey = $column;
+					$primaryKeyColumn = $column;
 				}
-				continue;
-			}
 
-			$columns[] = $platform->quoteSingleIdentifier($column->name);
+				if ($supportsReturning) {
+					$generatedColumnNames[] = $platform->quoteSingleIdentifier($column->name);
+					$generatedColumns[] = $column;
+				}
+			} else {
+				$columnNames[] = $platform->quoteSingleIdentifier($column->name);
 
-			if ($upsertColumns === null || in_array($column->name, $upsertColumns, true)) {
-				$update[] = $platform->quoteSingleIdentifier($column->name) . " = VALUES(" . $platform->quoteSingleIdentifier($column->name) . ")";
+				if ($upsertColumns === null || in_array($column->name, $upsertColumns, true)) {
+					$update[] = $platform->quoteSingleIdentifier($column->name) . " = VALUES(" . $platform->quoteSingleIdentifier($column->name) . ")";
+				}
 			}
 		}
 
@@ -123,22 +141,34 @@ class Persistence implements PersistenceInterface
 			$rows[] = "(" . implode(", ", $row) . ")";
 		}
 
-		$this->connection->executeStatement(
-			sprintf(
-				"INSERT INTO %s (%s) VALUES (%s)%s",
-				$platform->quoteSingleIdentifier($table->name),
-				implode(", ", $columns),
-				implode(", ", $rows),
-				match (count($update)) {
-					0 => "",
-					default => sprintf(" ON DUPLICATE KEY UPDATE %s", implode(", ", $update)),
-				},
-			),
-			$values,
+		$sql = sprintf(
+			"INSERT INTO %s (%s) VALUES %s%s%s",
+			$platform->quoteSingleIdentifier($table->name),
+			implode(", ", $columnNames),
+			implode(", ", $rows),
+			match (count($update)) {
+				0 => "",
+				default => sprintf(" ON DUPLICATE KEY UPDATE %s", implode(", ", $update)),
+			},
+			match ($supportsReturning) {
+				true => sprintf(" RETURNING %s", implode(", ", $generatedColumnNames)),
+				default => "",
+			},
 		);
 
-		if (count($objects) === 1 && $primaryKey !== null) {
-			$primaryKey->reflection->setValue($objects[0], $this->connection->lastInsertId());
+		$result = $this->connection->executeQuery($sql, $values);
+		if ($supportsReturning && count($generatedColumns) > 0) {
+			foreach ($result->iterateAssociative() as $index => $row) {
+				$object = $objects[$index];
+				foreach ($generatedColumns as $column) {
+					$column->reflection->setValue(
+						$object,
+						$this->valueConverter->databaseToObject($table, $column, $row[$column->name]),
+					);
+				}
+			}
+		} else if (count($objects) === 1 && $primaryKeyColumn !== null) {
+			$primaryKeyColumn->reflection->setValue($objects[0], $this->connection->lastInsertId());
 		}
 	}
 

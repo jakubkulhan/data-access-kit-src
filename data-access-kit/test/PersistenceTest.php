@@ -5,12 +5,19 @@ namespace DataAccessKit;
 use DataAccessKit\Fixture\User;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Doctrine\DBAL\Platforms\MySQLPlatform;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
+use Doctrine\DBAL\Platforms\SQLitePlatform;
 use Doctrine\DBAL\Tools\DsnParser;
+use LogicException;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
+use ReflectionProperty;
+use function get_class;
 use function getenv;
 use function iterator_to_array;
-use function var_dump;
+use function sprintf;
 
 #[Group("database")]
 class PersistenceTest extends TestCase
@@ -33,9 +40,20 @@ class PersistenceTest extends TestCase
 	private function setUpUsersTable(): void
 	{
 		$this->connection->executeStatement("DROP TABLE IF EXISTS users");
-		$this->connection->executeStatement("CREATE TABLE users (user_id INT PRIMARY KEY, first_name VARCHAR(255))");
-		$this->connection->executeStatement("INSERT INTO users (user_id, first_name) VALUES (1, 'Alice')");
-		$this->connection->executeStatement("INSERT INTO users (user_id, first_name) VALUES (2, 'Bob')");
+
+		$platform = $this->connection->getDatabasePlatform();
+		if ($platform instanceof AbstractMySQLPlatform) {
+			$this->connection->executeStatement("CREATE TABLE users (user_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, first_name VARCHAR(255))");
+		} else if ($platform instanceof PostgreSQLPlatform) {
+			$this->connection->executeStatement("CREATE TABLE users (user_id SERIAL PRIMARY KEY, first_name VARCHAR(255))");
+		} else if ($platform instanceof SQLitePlatform) {
+			$this->connection->executeStatement("CREATE TABLE users (user_id INTEGER PRIMARY KEY AUTOINCREMENT, first_name TEXT)");
+		} else {
+			throw new LogicException(sprintf("Unsupported database platform [%s].", get_class($platform)));
+		}
+
+		$this->connection->executeStatement("INSERT INTO users (first_name) VALUES ('Alice')");
+		$this->connection->executeStatement("INSERT INTO users (first_name) VALUES ('Bob')");
 	}
 
 	public function testSelect(): void
@@ -62,6 +80,42 @@ class PersistenceTest extends TestCase
 		$this->persistence->execute("DELETE FROM users WHERE user_id = 1");
 		$count = $this->persistence->selectScalar("SELECT COUNT(*) FROM users");
 		$this->assertEquals(1, $count);
+	}
+
+	public function testInsert(): void
+	{
+		$this->setUpUsersTable();
+		$user = new User();
+		$user->firstName = "Charlie";
+		$this->persistence->insert($user);
+		$this->assertEquals(3, $user->id);
+
+		$users = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name FROM users WHERE user_id = ?", [$user->id]));
+		$this->assertCount(1, $users);
+		$this->assertEquals($user->id, $users[0]->id);
+		$this->assertEquals($user->firstName, $users[0]->firstName);
+	}
+
+	public function testInsertAll(): void
+	{
+		$this->setUpUsersTable();
+
+		$user1 = new User();
+		$user1->firstName = "Charlie";
+
+		$user2 = new User();
+		$user2->firstName = "David";
+
+		$this->persistence->insertAll([$user1, $user2]);
+
+		if ($this->connection->getDatabasePlatform() instanceof MySQLPlatform) {
+			$rp = new ReflectionProperty(User::class, "id");
+			$this->assertFalse($rp->isInitialized($user1));
+			$this->assertFalse($rp->isInitialized($user2));
+		} else {
+			$this->assertEquals(3, $user1->id);
+			$this->assertEquals(4, $user2->id);
+		}
 	}
 
 }
