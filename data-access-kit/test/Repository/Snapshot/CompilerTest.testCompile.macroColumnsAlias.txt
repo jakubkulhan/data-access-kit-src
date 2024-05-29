@@ -14,7 +14,7 @@ final class MacroColumnsAliasRepository implements MacroColumnsAliasRepositoryIn
 
 	public function allColumnsAlias(): iterable
 	{
-		$result = $this->persistence->select(Foo::class, 'SELECT f.id, f.title, f.description FROM foos f', []);
+		$result = $this->persistence->select(Foo::class, 'SELECT f.id, f.title, f.description, f.created_at FROM foos f', []);
 
 		return $result;
 	}

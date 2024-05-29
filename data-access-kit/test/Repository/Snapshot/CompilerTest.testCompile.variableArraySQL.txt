@@ -1,0 +1,121 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\Attribute\Column;
+use DataAccessKit\PersistenceInterface;
+use DateTimeImmutable;
+
+final class VariableArraySQLRepository implements VariableArraySQLRepositoryInterface
+{
+	private object $findByIdsPostfixIdsArgumentItem;
+
+	private object $findByIdsArrayIdsArgumentItem;
+
+	private object $findByIdsArrayWithKeyIdsArgumentItem;
+
+	private object $findByIdsListIdsArgumentItem;
+
+	private object $findByCreationTimeCreationTimesArgumentItem;
+
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+		$this->findByIdsPostfixIdsArgumentItem = new class {
+			#[Column(name: "value")]
+			public int $value;
+		};
+		$this->findByIdsArrayIdsArgumentItem = new class {
+			#[Column(name: "value")]
+			public int $value;
+		};
+		$this->findByIdsArrayWithKeyIdsArgumentItem = new class {
+			#[Column(name: "value")]
+			public int $value;
+		};
+		$this->findByIdsListIdsArgumentItem = new class {
+			#[Column(name: "value")]
+			public int $value;
+		};
+		$this->findByCreationTimeCreationTimesArgumentItem = new class {
+			#[Column(name: "value")]
+			public DateTimeImmutable $value;
+		};
+	}
+
+	public function findByCreationTime(
+		array $creationTimes,
+	): array
+	{
+		$argumentCreationTimes = [];
+		foreach ($creationTimes as $item) {
+			$itemObject = clone $this->findByCreationTimeCreationTimesArgumentItem;
+			$itemObject->value = $item;
+			$argumentCreationTimes[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE createdAt IN (' . (count($argumentCreationTimes) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentCreationTimes) - 1)) . ')', [...$argumentCreationTimes]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByIdsArray(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsArrayIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByIdsArrayWithKey(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsArrayWithKeyIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByIdsList(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsListIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByIdsPostfix(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsPostfixIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+}

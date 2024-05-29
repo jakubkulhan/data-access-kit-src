@@ -14,7 +14,7 @@ final class MacroColumnsExceptRepository implements MacroColumnsExceptRepository
 
 	public function allColumnsExcept(): iterable
 	{
-		$result = $this->persistence->select(Foo::class, 'SELECT id, title FROM foos', []);
+		$result = $this->persistence->select(Foo::class, 'SELECT id, title, created_at FROM foos', []);
 
 		return $result;
 	}

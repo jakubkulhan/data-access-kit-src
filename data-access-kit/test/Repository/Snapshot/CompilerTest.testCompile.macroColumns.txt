@@ -14,7 +14,7 @@ final class MacroColumnsRepository implements MacroColumnsRepositoryInterface
 
 	public function allColumns(): iterable
 	{
-		$result = $this->persistence->select(Foo::class, 'SELECT id, title, description FROM foos', []);
+		$result = $this->persistence->select(Foo::class, 'SELECT id, title, description, created_at FROM foos', []);
 
 		return $result;
 	}

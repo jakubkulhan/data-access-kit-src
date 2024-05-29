@@ -1,0 +1,1 @@
+Method [DataAccessKit\Repository\Fixture\VariableArrayDocCommentMissingParamSQLRepositoryInterface::findByIds] has parameter $ids of type array, but does not have valid @param annotation for it. Please provide type for the array items.

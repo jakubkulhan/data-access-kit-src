@@ -14,7 +14,7 @@ final class MacroColumnsExceptMultipleRepository implements MacroColumnsExceptMu
 
 	public function allColumnsExceptMultiple(): iterable
 	{
-		$result = $this->persistence->select(Foo::class, 'SELECT id FROM foos', []);
+		$result = $this->persistence->select(Foo::class, 'SELECT id, created_at FROM foos', []);
 
 		return $result;
 	}

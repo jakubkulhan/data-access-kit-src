@@ -6,8 +6,8 @@ use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 
 #[Repository(Foo::class)]
-interface MacroColumnsExceptAllColumnRepositoryInterface
+interface VariableArrayNoDocCommentSQLRepositoryInterface
 {
-	#[SQL("SELECT %columns(except id, title, description, created_at) FROM foos")]
-	public function allColumnsExcept(): iterable;
+	#[SQL("SELECT * FROM foo WHERE id IN (@ids)")]
+	public function findByIds(array $ids): array;
 }

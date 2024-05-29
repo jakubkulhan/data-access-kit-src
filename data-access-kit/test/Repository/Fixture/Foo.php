@@ -4,6 +4,7 @@ namespace DataAccessKit\Repository\Fixture;
 
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
+use DateTimeImmutable;
 
 #[Table]
 class Foo
@@ -16,6 +17,9 @@ class Foo
 
 	#[Column]
 	public string $description;
+
+	#[Column]
+	public DateTimeImmutable $createdAt;
 
 	public int $notColumn;
 }

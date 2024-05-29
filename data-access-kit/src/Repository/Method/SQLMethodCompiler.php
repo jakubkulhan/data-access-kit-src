@@ -3,7 +3,6 @@
 namespace DataAccessKit\Repository\Method;
 
 use DataAccessKit\Attribute\Column;
-use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Compiler;
@@ -13,17 +12,25 @@ use DataAccessKit\Repository\Exception\NotFoundException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
+use Doctrine\Common\Annotations\PhpParser;
 use LogicException;
 use ReflectionNamedType;
+use ReflectionParameter;
 use function array_keys;
 use function array_map;
 use function array_search;
+use function chr;
 use function count;
+use function ctype_lower;
+use function explode;
 use function implode;
 use function in_array;
+use function preg_match;
+use function preg_quote;
 use function preg_replace_callback;
 use function preg_split;
 use function sprintf;
+use function ucfirst;
 
 /**
  * @implements MethodCompilerInterface<SQL>
@@ -32,10 +39,15 @@ class SQLMethodCompiler implements MethodCompilerInterface
 {
 	use CreateConstructorTrait;
 
+	private const DELIMITER = "\0";
+
+	private PhpParser $phpParser;
+
 	public function __construct(
 		private readonly Registry $registry,
 	)
 	{
+		$this->phpParser = new PhpParser();
 	}
 
 	public function compile(Result $result, ResultMethod $method, $attribute): void
@@ -51,25 +63,70 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 		$constructor = $this->createConstructorWithPersistenceProperty($result);
 
-		if ($method->reflection->getNumberOfParameters() > 0) {
-			$argumentsProperty = $method->name . "Arguments";
-			$result->property($argumentsProperty)
+		$nonArrayArgumentsPropertyName = $method->reflection->getName() . "Arguments";
+		$argumentsProperties = [];
+		foreach ($method->reflection->getParameters() as $rp) {
+			if ($rp->getType() instanceof ReflectionNamedType && $rp->getType()->getName() === "array") {
+				if (!preg_match(
+					'/@param\s+(?:
+							(?:array|list)<\s*(?:[^,>]+,\s*)?(?P<arrayValueType>[^,>]+)>
+							|
+							(?P<itemType>[^[]+)\[]
+						)\s+\$' . preg_quote($rp->getName(), '/') . '/xi',
+					$method->reflection->getDocComment() ?: "",
+					$m,
+				)) {
+					throw new CompilerException(sprintf(
+						"Method [%s::%s] has parameter \$%s of type array, but does not have valid @param annotation for it. Please provide type for the array items.",
+						$result->reflection->getName(),
+						$method->reflection->getName(),
+						$rp->getName(),
+					));
+				}
+				if (!empty($m["arrayValueType"])) {
+					$phpType = $m["arrayValueType"];
+				} else if (!empty($m["itemType"])) {
+					$phpType = $m["itemType"];
+				} else {
+					throw new LogicException("Unreachable statement.");
+				}
+
+				$useStatements = $this->phpParser->parseUseStatements($result->reflection);
+				if (isset($useStatements[$phpType])) {
+					$phpType = $result->use($useStatements[$phpType]);
+				} else if (!ctype_lower($phpType[0])) {
+					$phpType = $result->use($phpType);
+				}
+
+				$propertyName = $method->reflection->getName() . ucfirst($rp->getName()) . "ArgumentItem";
+				$name = "value";
+
+			} else {
+				$phpType = Compiler::phpType($result, $rp->getType());
+				$propertyName = $nonArrayArgumentsPropertyName;
+				$name = $rp->getName();
+			}
+
+			if (!isset($argumentsProperties[$propertyName])) {
+				$argumentsProperties[$propertyName] = [];
+			}
+			$argumentsProperties[$propertyName][] = "#[{$result->use(Column::class)}(name: \"{$name}\")]";
+			$argumentsProperties[$propertyName][] = "public {$phpType} \${$name};";
+		}
+
+		foreach ($argumentsProperties as $name => $anonymousClassLines) {
+			$result->property($name)
 				->setVisibility("private")
 				->setType("object");
-			$columnAlias = $result->use(Column::class);
-			$constructor->line("\$this->{$argumentsProperty} = new class {")->indent();
-			foreach ($method->reflection->getParameters() as $rp) {
-				$phpType = Compiler::phpType($result, $rp->getType());
-				$constructor->line("#[{$columnAlias}(name: \"{$rp->getName()}\")]");
-				$constructor->line("public {$phpType} \$" . $rp->getName() . ";");
+			$constructor->line("\$this->{$name} = new class {")->indent();
+			foreach ($anonymousClassLines as $line) {
+				$constructor->line($line);
 			}
 			$constructor->dedent()->line("};");
 		}
 
-		[$sql, $sqlParameters] = $this->expandSQLMacrosAndVariables($method, $result, $attribute);
-
-		if ($method->reflection->getNumberOfParameters() > 0) {
-			$method->line("\$arguments = clone \$this->{$argumentsProperty};");
+		if (isset($argumentsProperties[$nonArrayArgumentsPropertyName])) {
+			$method->line("\$arguments = clone \$this->{$nonArrayArgumentsPropertyName};");
 			foreach ($method->reflection->getParameters() as $rp) {
 				$method->line("\$arguments->{$rp->getName()} = \$" . $rp->getName() . ";");
 			}
@@ -77,8 +134,10 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$method->line();
 		}
 
+		[$sqlPartExpressions, $sqlParameterExpression] = $this->expandSQLMacrosAndVariables($method, $result, $attribute);
+
 		if ($returnType->getName() === "void") {
-			$method->line("\$this->persistence->execute(" . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+			$method->line("\$this->persistence->execute(" . implode(" . ", $sqlPartExpressions) . ", [" . implode(", ", $sqlParameterExpression) . "]);");
 
 		} else if ($returnType->isBuiltin() && !in_array($returnType->getName(), ["array", "iterable"], true)) {
 			if (!in_array($returnType->getName(), ["int", "float", "string", "bool"], true)) {
@@ -89,7 +148,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 					$returnType->getName(),
 				));
 			}
-			$method->line("\$result = \$this->persistence->selectScalar(" . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+			$method->line("\$result = \$this->persistence->selectScalar(" . implode(" . ", $sqlPartExpressions) . ", [" . implode(", ", $sqlParameterExpression) . "]);");
 			if ($returnType->allowsNull()) {
 				$method->line("return \$result === null ? null : ({$returnType->getName()})\$result;");
 			} else {
@@ -116,7 +175,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				$itemAlias = $itemType;
 			}
 
-			$method->line("\$result = \$this->persistence->select({$itemAlias}::class, " . Compiler::varExport($sql) . ", [" . implode(", ", $sqlParameters) . "]);");
+			$method->line("\$result = \$this->persistence->select({$itemAlias}::class, " . implode(" . ", $sqlPartExpressions) . ", [" . implode(", ", $sqlParameterExpression) . "]);");
 			$method->line();
 			if ($returnType->getName() === "iterable") {
 				$method->line("return \$result;");
@@ -151,7 +210,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			$reflectionParametersByName[$rp->getName()] = $rp;
 		}
 
-		$sqlParameters = [];
+		$sqlParameterExpressions = [];
 		$usedVariables = [];
 		$sql = preg_replace_callback(
 			'/
@@ -166,7 +225,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
 			/xi',
-			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameters, &$usedVariables) {
+			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables) {
 				if (!empty($m["variable"])) {
 					$name = $m["variable"];
 					if (!isset($reflectionParametersByName[$name])) {
@@ -177,12 +236,29 @@ class SQLMethodCompiler implements MethodCompilerInterface
 							$name,
 						));
 					}
+					/** @var ReflectionParameter $rp */
 					$rp = $reflectionParametersByName[$name];
-
-					$sqlParameters[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
 					$usedVariables[$name] = true;
 
-					return "?";
+					if ($rp->getType() instanceof ReflectionNamedType && $rp->getType()->getName() === "array") {
+						$argumentVariableName = "argument" . ucfirst($rp->getName());
+						$method
+							->line("\${$argumentVariableName} = [];")
+							->line("foreach (\${$rp->getName()} as \$item) {")
+							->indent()
+							->line("\$itemObject = clone \$this->" . $method->reflection->getName() . ucfirst($rp->getName()) . "ArgumentItem;")
+							->line("\$itemObject->value = \$item;")
+							->line("\${$argumentVariableName}[] = \$this->persistence->toRow(\$itemObject)['value'];")
+							->dedent()
+							->line("}");
+
+						$sqlParameterExpressions[] = "...\${$argumentVariableName}";
+						return static::DELIMITER . $argumentVariableName . static::DELIMITER;
+
+					} else {
+						$sqlParameterExpressions[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
+						return "?";
+					}
 
 				} else if (!empty($m["table"])) {
 					return $table->name;
@@ -247,9 +323,18 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			}
 		}
 
+		$sqlPartExpressions = [];
+		foreach (explode(static::DELIMITER, $sql) as $index => $part) {
+			if ($index % 2 === 0) {
+				$sqlPartExpressions[] = Compiler::varExport($part);
+			} else {
+				$sqlPartExpressions[] = "(count(\${$part}) === 0 ? 'NULL' : '?' . str_repeat(', ?', count(\${$part}) - 1))";
+			}
+		}
+
 		return [
-			$sql,
-			$sqlParameters,
+			$sqlPartExpressions,
+			$sqlParameterExpressions,
 		];
 	}
 }

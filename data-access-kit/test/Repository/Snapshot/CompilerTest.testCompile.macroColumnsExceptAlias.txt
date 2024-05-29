@@ -14,7 +14,7 @@ final class MacroColumnsExceptAliasRepository implements MacroColumnsExceptAlias
 
 	public function allColumnsExceptAlias(): iterable
 	{
-		$result = $this->persistence->select(Foo::class, 'SELECT f.id, f.title FROM foos f', []);
+		$result = $this->persistence->select(Foo::class, 'SELECT f.id, f.title, f.created_at FROM foos f', []);
 
 		return $result;
 	}

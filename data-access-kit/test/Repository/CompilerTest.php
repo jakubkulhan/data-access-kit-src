@@ -6,6 +6,9 @@ use DataAccessKit\DefaultNameConverter;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArrayDocCommentMissingParamSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArrayNoDocCommentSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArraySQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
@@ -113,6 +116,7 @@ class CompilerTest extends TestCase
 			SimpleSQLObjectRepositoryInterface::class,
 			SimpleSQLNullableObjectRepositoryInterface::class,
 			VariableSQLRepositoryInterface::class,
+			VariableArraySQLRepositoryInterface::class,
 			NullableScalarSQLRepositoryInterface::class,
 			VoidSQLRepositoryInterface::class,
 			MacroTableSQLRepositoryInterface::class,
@@ -165,6 +169,8 @@ class CompilerTest extends TestCase
 			UnsupportedReturnTypeMixedRepositoryInterface::class,
 			UnsupportedReturnTypeObjectRepositoryInterface::class,
 			UnknownVariableSQLRepositoryInterface::class,
+			VariableArrayNoDocCommentSQLRepositoryInterface::class,
+			VariableArrayDocCommentMissingParamSQLRepositoryInterface::class,
 			MacroColumnsExceptUnknownColumnRepositoryInterface::class,
 			MacroColumnsExceptAllColumnRepositoryInterface::class,
 			MacroUnknownRepositoryInterface::class,

@@ -27,7 +27,7 @@ final class FindArrayRepository implements FindArrayRepositoryInterface
 		$arguments->title = $title;
 		$arguments = $this->persistence->toRow($arguments);
 
-		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description FROM foos t WHERE t.title = ?', [$arguments['title']]);
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE t.title = ?', [$arguments['title']]);
 
 		return iterator_to_array($result);
 	}
