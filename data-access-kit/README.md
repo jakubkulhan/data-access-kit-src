@@ -73,6 +73,8 @@ composer require data-access-kit/data-access-kit@dev-main
 DataAccessKit maps plain old PHP objects to database using [attributes](https://www.php.net/manual/en/language.attributes.overview.php).
 
 ```php
+use DataAccessKit\Attribute\Table;
+
 #[Table(
     name: "users",
 )]
@@ -83,6 +85,8 @@ DataAccessKit maps plain old PHP objects to database using [attributes](https://
 - `name` specifies the table name. If not provided, the table name is derived from the class name by `NameConverterInterface`. Default name converter converts CamelCase to snake_case and pluralizes the name (i.e. `User` to `users`, `UserCredential` to `user_credentials`).
 
 ```php
+use DataAccessKit\Attribute\Column;
+
 #[Column(
     name: "user_id",
     primary: true,
@@ -105,6 +109,8 @@ Persistence layer is based on [Doctrine\DBAL](https://www.doctrine-project.org/p
 Repositories are generated from interfaces. The interface needs to be annotated with [Repository](./src/Repository/Attribute/Repository.php) attribute.
 
 ```php
+use DataAccessKit\Repository\Attribute\Repository;
+
 #[Repository(
     class: User::class,
 )]
@@ -123,6 +129,8 @@ They can return a single entity or a collection of entities. Supported return ty
 A single entity return type must be the class the repository is for. If the return type is non-nullable and no rows is returned from the database, the method throws an exception. Also, if multiple rows are returned from the database, an exception is thrown.
 
 ```php
+use DataAccessKit\Repository\Attribute\Find;
+
 #[Find(
     select: "%columns(except password alias u)", // optional, default is all columns specified by Column attributes
     from: "users", // optional, default is the table the repository is for
@@ -150,6 +158,8 @@ public function find(int $id): User;
 Count methods return number of rows in the database. They must return `int`.
 
 ```php
+use DataAccessKit\Repository\Attribute\Count;
+
 #[Count(
     from: "users", // optional, default is the table the repository is for
     alias: "u", // optional, default is "t"
@@ -166,9 +176,11 @@ public function count(int $id): int;
 
 ### SQL
 
-SQL methods execute arbitrary SQL queries. They can return a single entity, a collection of entities, or a scalar value.
+SQL methods execute arbitrary SQL queries. They can return a single entity, a collection of entities, a scalar value, or nothing.
 
 ```php
+use DataAccessKit\Repository\Attribute\SQL;
+
 #[SQL(
     sql: "SELECT * FROM users u WHERE u.first_name = @firstName", // required
     itemType: User::class, // optional
@@ -198,6 +210,8 @@ There are also several macros that expand to SQL fragments.
 The same as SQL attribute, but the SQL query is loaded from a file.
 
 ```php
+use DataAccessKit\Repository\Attribute\SQLFile;
+
 #[SQLFile(
     file: "sql/find_by_first_name.sql", // required
     itemType: User::class, // optional
@@ -205,16 +219,60 @@ The same as SQL attribute, but the SQL query is loaded from a file.
 public function sqlFile(string $firstName): iterable;
 ```
 
+### Insert, Upsert, Update, Delete
+
+To manipulate data in the database, you can use Insert, Upsert, Update, and Delete methods.
+
+```php
+use DataAccessKit\Repository\Attribute\Insert;
+use DataAccessKit\Repository\Attribute\Upsert;
+use DataAccessKit\Repository\Attribute\Update;
+use DataAccessKit\Repository\Attribute\Delete;
+
+#[Insert]
+public function insert(User $user): void;
+
+#[Insert]
+public function insertAll(array $users): void;
+
+#[Upsert(
+    columns: ["first_name", "last_name"], // optional, if omitted/null all columns specified by Column attributes are updated
+)]
+public function upsert(User $user): void;
+
+#[Upsert(
+    columns: ...,
+)]
+public function upsertAll(array $users): void;
+
+#[Update(
+    columns: ..., // optional, if omitted/null all columns specified by Column attributes are updated
+)]
+public function update(User $user): void;
+
+#[Delete]
+public function delete(User $user): void;
+
+#[Delete]
+public function deleteAll(array $users): void;
+```
+
+Methods support both single entity and array of entities signatures, except for update, which works only on a single object. Array methods issue a single SQL query with all the data.
+
+Upsert and update methods can be limited to update only specific columns in the `columns` argument of the attribute.
+
 ### Delegate
 
 If a repository method is more complex than what can be expressed by a single SQL query, you will probably want to implement it yourself.
 
 ```php
+use DataAccessKit\Repository\Attribute\Delegate;
+
 #[Delegate(
     class: UserRepositoryDelegate::class, // required
     method: "delegateMethodName", // optional, default is the same name as the annotated method
 )]
-public function methodName(): array; 
+public function delegate(string $delegatedParameter): array; 
 ```
 
 - `class` - the class that implements the method. It can be a class, an interface, or a trait.
