@@ -14,6 +14,10 @@ use DataAccessKit\Repository\Fixture\EmptyFileNameSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\InsertBadParameterTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\InsertRepositoryInterface;
+use DataAccessKit\Repository\Fixture\InsertReturnTypeNonVoidRepositoryInterface;
+use DataAccessKit\Repository\Fixture\InsertTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptAllColumnRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptAliasRepositoryInterface;
 use DataAccessKit\Repository\Fixture\MacroColumnsExceptMultipleAliasRepositoryInterface;
@@ -109,6 +113,7 @@ class CompilerTest extends TestCase
 			DelegateToClassRepositoryInterface::class,
 			DelegateToInterfaceRepositoryInterface::class,
 			DelegateToTraitRepositoryInterface::class,
+			InsertRepositoryInterface::class,
 		]);
 	}
 
@@ -145,6 +150,9 @@ class CompilerTest extends TestCase
 			MacroColumnsExceptUnknownColumnRepositoryInterface::class,
 			MacroColumnsExceptAllColumnRepositoryInterface::class,
 			MacroUnknownRepositoryInterface::class,
+			InsertReturnTypeNonVoidRepositoryInterface::class,
+			InsertTooManyParametersRepositoryInterface::class,
+			InsertBadParameterTypeRepositoryInterface::class,
 		]);
 	}
 

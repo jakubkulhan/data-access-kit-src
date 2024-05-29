@@ -1,0 +1,1 @@
+Insert method [DataAccessKit\Repository\Fixture\InsertBadParameterTypeRepositoryInterface::insert] must have exactly one parameter with type [DataAccessKit\Repository\Fixture\Foo] or array.

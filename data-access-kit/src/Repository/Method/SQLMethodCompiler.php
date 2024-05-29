@@ -30,6 +30,8 @@ use function sprintf;
  */
 class SQLMethodCompiler implements MethodCompilerInterface
 {
+	use CreateConstructorTrait;
+
 	public function __construct(
 		private readonly Registry $registry,
 	)
@@ -47,10 +49,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			));
 		}
 
-		$constructor = $result->method("__construct");
-		$constructor->parameter("persistence")
-			->setVisibility("private readonly")
-			->setType($result->use(PersistenceInterface::class));
+		$constructor = $this->createConstructorWithPersistenceProperty($result);
 
 		if ($method->reflection->getNumberOfParameters() > 0) {
 			$argumentsProperty = $method->name . "Arguments";

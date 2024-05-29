@@ -6,6 +6,7 @@ use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Count;
 use DataAccessKit\Repository\Attribute\Delegate;
 use DataAccessKit\Repository\Attribute\Find;
+use DataAccessKit\Repository\Attribute\Insert;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Attribute\SQLFile;
@@ -13,6 +14,7 @@ use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Method\CountMethodCompiler;
 use DataAccessKit\Repository\Method\DelegateMethodCompiler;
 use DataAccessKit\Repository\Method\FindMethodCompiler;
+use DataAccessKit\Repository\Method\InsertMethodCompiler;
 use DataAccessKit\Repository\Method\SQLFileMethodCompiler;
 use DataAccessKit\Repository\Method\SQLMethodCompiler;
 use LogicException;
@@ -50,6 +52,7 @@ class Compiler
 		$this->registerMethodCompiler(Count::class, new CountMethodCompiler($registry, $sqlMethodCompiler));
 		$this->registerMethodCompiler(SQLFile::class, new SQLFileMethodCompiler($sqlMethodCompiler));
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
+		$this->registerMethodCompiler(Insert::class, new InsertMethodCompiler());
 	}
 
 	/**
@@ -144,31 +147,16 @@ class Compiler
 			if ($methodCompiler === null) {
 				$words = explode(" ", strtolower(preg_replace('/(?<!^|[A-Z])[A-Z]/', ' $0', $rm->getName())));
 				if (in_array($words[0], ["get", "find"], true)) {
-					$returnType = $rm->getReturnType();
-					if (!$returnType instanceof ReflectionNamedType || !in_array($returnType->getName(), ["array", "iterable", $result->repository->class], true)) {
-						throw new CompilerException(sprintf(
-							"Find method [%s::%s] must return array, iterable, or [%s] to able to be generated. Either change the return type, add an attribute, or remove the method.",
-							$result->reflection->getName(),
-							$rm->getName(),
-							$result->repository->class,
-						));
-					}
-
 					$methodCompiler = $this->methodCompilers[Find::class];
 					$methodCompilerAttribute = new Find();
 
-				} else if (in_array($words[0], ["count"], true)) {
-					$returnType = $rm->getReturnType();
-					if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== "int") {
-						throw new CompilerException(sprintf(
-							"Count method [%s::%s] must return int to able to be generated. Either change the return type, add an attribute, or remove the method.",
-							$result->reflection->getName(),
-							$rm->getName(),
-						));
-					}
-
+				} else if ($words[0] === "count") {
 					$methodCompiler = $this->methodCompilers[Count::class];
 					$methodCompilerAttribute = new Count();
+
+				} else if ($words[0] === "insert") {
+					$methodCompiler = $this->methodCompilers[Insert::class];
+					$methodCompilerAttribute = new Insert();
 
 				} else {
 					throw new CompilerException(sprintf(

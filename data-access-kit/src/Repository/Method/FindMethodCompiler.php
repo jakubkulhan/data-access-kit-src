@@ -5,11 +5,15 @@ namespace DataAccessKit\Repository\Method;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Find;
 use DataAccessKit\Repository\Attribute\SQL;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\MethodCompilerInterface;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
+use ReflectionNamedType;
 use function array_map;
 use function implode;
+use function in_array;
+use function sprintf;
 
 /**
  * @implements MethodCompilerInterface<Find>
@@ -27,6 +31,16 @@ class FindMethodCompiler implements MethodCompilerInterface
 
 	public function compile(Result $result, ResultMethod $method, $attribute): void
 	{
+		$returnType = $method->reflection->getReturnType();
+		if (!$returnType instanceof ReflectionNamedType || !in_array($returnType->getName(), ["array", "iterable", $result->repository->class], true)) {
+			throw new CompilerException(sprintf(
+				"Find method [%s::%s] must return array, iterable, or [%s] to able to be generated. Either change the return type, add an attribute, or remove the method.",
+				$result->reflection->getName(),
+				$method->reflection->getName(),
+				$result->repository->class,
+			));
+		}
+
 		$table = $this->registry->get($result->repository->class, true);
 		$select = $attribute->select;
 		if ($select === null) {

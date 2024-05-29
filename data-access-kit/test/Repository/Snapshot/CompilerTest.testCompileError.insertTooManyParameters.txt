@@ -1,0 +1,1 @@
+Insert method [DataAccessKit\Repository\Fixture\InsertTooManyParametersRepositoryInterface::insertTwo] must have exactly one parameter.

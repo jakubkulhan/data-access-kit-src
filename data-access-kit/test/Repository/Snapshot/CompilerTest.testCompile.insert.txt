@@ -1,0 +1,28 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\PersistenceInterface;
+
+final class InsertRepository implements InsertRepositoryInterface
+{
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+	}
+
+	public function insert(
+		Foo $foo,
+	): void
+	{
+		$this->persistence->insert($foo);
+	}
+
+	public function insertAll(
+		array $foos,
+	): void
+	{
+		$this->persistence->insertAll($foos);
+	}
+}
