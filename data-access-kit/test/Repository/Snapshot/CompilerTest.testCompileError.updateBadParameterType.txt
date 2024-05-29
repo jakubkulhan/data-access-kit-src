@@ -1,0 +1,1 @@
+Update method [DataAccessKit\Repository\Fixture\UpdateBadParameterTypeRepositoryInterface::update] must have exactly one parameter with type [DataAccessKit\Repository\Fixture\Foo].

@@ -53,6 +53,10 @@ use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeMixedRepositoryInterfa
 use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeObjectRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnsupportedReturnTypeUnionRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UnusedVariableSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpdateBadParameterTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpdateRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpdateReturnTypeNonVoidRepositoryInterface;
+use DataAccessKit\Repository\Fixture\UpdateTooManyParametersRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -114,6 +118,7 @@ class CompilerTest extends TestCase
 			DelegateToInterfaceRepositoryInterface::class,
 			DelegateToTraitRepositoryInterface::class,
 			InsertRepositoryInterface::class,
+			UpdateRepositoryInterface::class,
 		]);
 	}
 
@@ -153,6 +158,9 @@ class CompilerTest extends TestCase
 			InsertReturnTypeNonVoidRepositoryInterface::class,
 			InsertTooManyParametersRepositoryInterface::class,
 			InsertBadParameterTypeRepositoryInterface::class,
+			UpdateReturnTypeNonVoidRepositoryInterface::class,
+			UpdateTooManyParametersRepositoryInterface::class,
+			UpdateBadParameterTypeRepositoryInterface::class,
 		]);
 	}
 

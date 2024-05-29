@@ -1,0 +1,1 @@
+Update method [DataAccessKit\Repository\Fixture\UpdateTooManyParametersRepositoryInterface::updateTwo] must have exactly one parameter.

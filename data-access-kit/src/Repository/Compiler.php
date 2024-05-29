@@ -10,6 +10,7 @@ use DataAccessKit\Repository\Attribute\Insert;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Attribute\SQLFile;
+use DataAccessKit\Repository\Attribute\Update;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Method\CountMethodCompiler;
 use DataAccessKit\Repository\Method\DelegateMethodCompiler;
@@ -17,6 +18,7 @@ use DataAccessKit\Repository\Method\FindMethodCompiler;
 use DataAccessKit\Repository\Method\InsertMethodCompiler;
 use DataAccessKit\Repository\Method\SQLFileMethodCompiler;
 use DataAccessKit\Repository\Method\SQLMethodCompiler;
+use DataAccessKit\Repository\Method\UpdateMethodCompiler;
 use LogicException;
 use ReflectionAttribute;
 use ReflectionClass;
@@ -53,6 +55,7 @@ class Compiler
 		$this->registerMethodCompiler(SQLFile::class, new SQLFileMethodCompiler($sqlMethodCompiler));
 		$this->registerMethodCompiler(Delegate::class, new DelegateMethodCompiler());
 		$this->registerMethodCompiler(Insert::class, new InsertMethodCompiler());
+		$this->registerMethodCompiler(Update::class, new UpdateMethodCompiler());
 	}
 
 	/**
@@ -157,6 +160,10 @@ class Compiler
 				} else if ($words[0] === "insert") {
 					$methodCompiler = $this->methodCompilers[Insert::class];
 					$methodCompilerAttribute = new Insert();
+
+				} else if ($words[0] === "update") {
+					$methodCompiler = $this->methodCompilers[Update::class];
+					$methodCompilerAttribute = new Update();
 
 				} else {
 					throw new CompilerException(sprintf(
