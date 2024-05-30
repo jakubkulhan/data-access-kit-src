@@ -262,8 +262,13 @@ class Persistence implements PersistenceInterface
 		$setValues = [];
 		$where = [];
 		$whereValues = [];
+		$returningColumns = [];
 
 		foreach ($table->columns as $column) {
+			if ($column->generated && !$column->primary) {
+				$returningColumns[] = $column;
+			}
+
 			if ($column->reflection->isInitialized($data)) {
 				$value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($data));
 
@@ -274,7 +279,6 @@ class Persistence implements PersistenceInterface
 					$set[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
 					$setValues[] = $value;
 				}
-
 
 			} else if ($column->primary) {
 				throw new LogicException(sprintf("Primary column [%s] not initialized.", $column->name));
@@ -289,15 +293,48 @@ class Persistence implements PersistenceInterface
 			throw new LogicException("Only primary columns, nothing to update.");
 		}
 
-		$this->connection->executeStatement(
+		$supportsReturning = match (true) {
+			$platform instanceof PostgreSQLPlatform => true,
+			$platform instanceof SQLitePlatform => true,
+			default => false,
+		};
+
+		$result = $this->connection->executeQuery(
 			sprintf(
-				"UPDATE %s SET %s WHERE %s",
+				"UPDATE %s SET %s WHERE %s%s",
 				$platform->quoteSingleIdentifier($table->name),
 				implode(", ", $set),
 				implode(" AND ", $where),
+				match (true) {
+					count($returningColumns) > 0 && $supportsReturning => sprintf(
+						" RETURNING %s",
+						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
+					),
+					default => "",
+				},
 			),
 			array_merge($setValues, $whereValues),
 		);
+		if (count($returningColumns) > 0) {
+			if (!$supportsReturning) {
+				$result = $this->connection->executeQuery(
+					sprintf(
+						"SELECT %s FROM %s WHERE %s",
+						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
+						$platform->quoteSingleIdentifier($table->name),
+						implode(" AND ", $where),
+					),
+					$whereValues,
+				);
+			}
+			$row = $result->fetchAssociative();
+			foreach ($returningColumns as $column) {
+				$column->reflection->setValue(
+					$data,
+					$this->valueConverter->databaseToObject($table, $column, $row[$column->name]),
+				);
+			}
+		}
 	}
 
 	public function delete(object|array $data): void

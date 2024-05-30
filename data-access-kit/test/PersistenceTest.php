@@ -287,4 +287,15 @@ class PersistenceTest extends TestCase
 		$this->assertQueriesSnapshot();
 	}
 
+	public function testUpdate(): void
+	{
+		$user = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = 1"))[0];
+		$user->firstName = "Charlie";
+		$user->lastName = "Brown";
+		$this->persistence->update($user);
+		$this->assertEquals("Charlie Brown", $user->fullName);
+
+		$this->assertQueriesSnapshot();
+	}
+
 }
