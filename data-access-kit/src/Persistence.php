@@ -9,8 +9,10 @@ use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Platforms\SQLitePlatform;
+use InvalidArgumentException;
 use LogicException;
 use ReflectionClass;
+use function array_fill;
 use function array_map;
 use function array_merge;
 use function count;
@@ -18,7 +20,6 @@ use function implode;
 use function in_array;
 use function is_array;
 use function sprintf;
-use function var_dump;
 
 class Persistence implements PersistenceInterface
 {
@@ -69,6 +70,10 @@ class Persistence implements PersistenceInterface
 
 	public function upsert(object|array $data, ?array $columns = null): void
 	{
+		if ($columns === []) {
+			throw new InvalidArgumentException("Columns cannot be empty array. Either pass null to update all columns, or pass array of column names to update specific columns.");
+		}
+
 		if (!is_array($data)) {
 			$data = [$data];
 		}
@@ -132,7 +137,7 @@ class Persistence implements PersistenceInterface
 			$platform instanceof SQLitePlatform => true,
 			default => false,
 		};
-		if (count($returningColumns) > 0 && count($objects) > 1 && !$supportsReturning) {
+		if (count($returningColumns) > 0 && count($objects) > 1 && $upsertColumns === [] && !$supportsReturning) {
 			throw new PersistenceException(sprintf(
 				"Database platform [%s] does not support INSERT ... RETURNING statement, cannot insert multiple rows with generated columns. Either insert one row at a time, or generate primary key in application code and use upsert() method.",
 				(new ReflectionClass($platform))->getShortName(),
@@ -219,29 +224,38 @@ class Persistence implements PersistenceInterface
 			$primaryColumns[0]->reflection->setValue($objects[0], $this->connection->lastInsertId());
 		}
 
-		if (count($returningColumns) > $primaryGeneratedCount && !$supportsReturning) {
+		if (count($returningColumns) > 0 && count($returningColumns) > $primaryGeneratedCount && !$supportsReturning) {
+			$values = [];
+			foreach ($objects as $object) {
+				foreach ($primaryColumns as $column) {
+					$values[] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+				}
+			}
 			$result = $this->connection->executeQuery(
 				sprintf(
-					"SELECT %s FROM %s WHERE %s",
+					"SELECT %s FROM %s WHERE (%s) IN (%s)",
 					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
 					$platform->quoteSingleIdentifier($table->name),
-					implode(" AND ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name) . " = ?", $primaryColumns)),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $primaryColumns)),
+					implode(", ", array_fill(0, count($objects), "(" . implode(", ", array_fill(0, count($primaryColumns), "?")) . ")")),
 				),
-				array_map(fn(Column $it) => $this->valueConverter->objectToDatabase($table, $it, $it->reflection->getValue($objects[0])), $primaryColumns),
+				$values,
 			);
-			$row = $result->fetchAssociative();
-			foreach ($returningColumns as $column) {
-				$column->reflection->setValue(
-					$objects[0],
-					$this->valueConverter->databaseToObject($table, $column, $row[$column->name]),
-				);
+			foreach ($result->iterateAssociative() as $index => $row) {
+				$object = $objects[$index];
+				foreach ($returningColumns as $column) {
+					$column->reflection->setValue(
+						$object,
+						$this->valueConverter->databaseToObject($table, $column, $row[$column->name]),
+					);
+				}
 			}
 		}
 	}
 
-	public function update(object $object, ?array $columns = null): void
+	public function update(object $data, ?array $columns = null): void
 	{
-		$table = $this->registry->get($object, true);
+		$table = $this->registry->get($data, true);
 		$platform = $this->connection->getDatabasePlatform();
 
 		$set = [];
@@ -250,8 +264,8 @@ class Persistence implements PersistenceInterface
 		$whereValues = [];
 
 		foreach ($table->columns as $column) {
-			if ($column->reflection->isInitialized($object)) {
-				$value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+			if ($column->reflection->isInitialized($data)) {
+				$value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($data));
 
 				if ($column->primary) {
 					$where[] = $platform->quoteSingleIdentifier($column->name) . " = ?";

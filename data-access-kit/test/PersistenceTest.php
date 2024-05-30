@@ -27,6 +27,7 @@ use function implode;
 use function iterator_to_array;
 use function sprintf;
 use function str_replace;
+use function var_dump;
 use const DIRECTORY_SEPARATOR;
 
 #[Group("database")]
@@ -170,7 +171,8 @@ class PersistenceTest extends TestCase
 
 	public function testExecute(): void
 	{
-		$this->persistence->execute("DELETE FROM users WHERE user_id = 1");
+		$affected = $this->persistence->execute("DELETE FROM users WHERE user_id = 1");
+		$this->assertEquals(1, $affected);
 		$count = $this->persistence->selectScalar("SELECT COUNT(*) FROM users");
 		$this->assertEquals(1, $count);
 		$this->assertQueriesSnapshot();
@@ -242,13 +244,45 @@ class PersistenceTest extends TestCase
 		$user->id = 1;
 		$user->firstName = "Charlie";
 		$user->lastName = "Brown";
+
 		$this->persistence->upsert($user);
 		$this->assertEquals(1, $user->id);
 
-		$users = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = ?", [$user->id]));
-		$this->assertCount(1, $users);
-		$this->assertEquals($user->id, $users[0]->id);
-		$this->assertEquals($user->firstName, $users[0]->firstName);
+		$selectUsers = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = ?", [$user->id]));
+		$this->assertCount(1, $selectUsers);
+		$this->assertEquals($user->id, $selectUsers[0]->id);
+		$this->assertEquals($user->firstName, $selectUsers[0]->firstName);
+
+		$this->assertQueriesSnapshot();
+	}
+
+	public function testUpsertAll(): void
+	{
+		$user1 = new User();
+		$user1->id = 1;
+		$user1->firstName = "Charlie";
+		$user1->lastName = "Brown";
+
+		$user2 = new User();
+		$user2->id = 2;
+		$user2->firstName = "David";
+		$user2->lastName = "White";
+
+		$users = [$user1, $user2];
+
+		$this->persistence->upsert($users);
+		$this->assertEquals("Charlie Brown", $user1->fullName);
+		$this->assertEquals("David White", $user2->fullName);
+
+		$selectUsers = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users"));
+		$this->assertCount(2, $selectUsers);
+		foreach ($selectUsers as $index => $selectUser) {
+			$user = $users[$index];
+			$this->assertEquals($user->id, $selectUser->id);
+			$this->assertEquals($user->firstName, $selectUser->firstName);
+			$this->assertEquals($user->lastName, $selectUser->lastName);
+			$this->assertEquals($user->firstName . " " . $user->lastName, $selectUser->fullName);
+		}
 
 		$this->assertQueriesSnapshot();
 	}
