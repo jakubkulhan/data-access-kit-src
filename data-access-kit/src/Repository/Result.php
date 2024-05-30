@@ -12,7 +12,7 @@ use function implode;
 use function ksort;
 use function str_ends_with;
 use function str_starts_with;
-use function usort;
+use function uasort;
 use const SORT_NATURAL;
 
 class Result implements Stringable
@@ -89,9 +89,14 @@ class Result implements Stringable
 		return $this->methods[$name] ??= new ResultMethod($name);
 	}
 
+	public function hasMethod(string $name): bool
+	{
+		return isset($this->methods[$name]);
+	}
+
 	public function sortMethod(array $methodIndices): void
 	{
-		usort($this->methods, function (ResultMethod $a, ResultMethod $b) use ($methodIndices) {
+		uasort($this->methods, function (ResultMethod $a, ResultMethod $b) use ($methodIndices) {
 			if (isset($methodIndices[$a->name]) && isset($methodIndices[$b->name])) {
 				return $methodIndices[$a->name] <=> $methodIndices[$b->name];
 			} else if (isset($methodIndices[$a->name]) || $b->name === "__construct") {

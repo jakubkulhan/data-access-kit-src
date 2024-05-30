@@ -13,13 +13,13 @@ class ResultMethod implements Stringable
 
 	public readonly ReflectionMethod $reflection;
 
-	public string $visibility = "public";
+	private string $visibility = "public";
 	/** @var array<string, ResultParameter> */
-	public array $parameters = [];
-	public string $returnType = "";
-	public string $body = "";
+	private array $parameters = [];
+	private string $returnType = "";
+	private string $body = "";
 	/** @var array<string, ResultAttribute> */
-	public array $attributes = [];
+	private array $attributes = [];
 
 	private int $level = 0;
 
@@ -44,6 +44,11 @@ class ResultMethod implements Stringable
 	public function parameter(string $name): ResultParameter
 	{
 		return $this->parameters[$name] ??= new ResultParameter($name);
+	}
+
+	public function hasParameter(string $name): bool
+	{
+		return isset($this->parameters[$name]);
 	}
 
 	public function setReturnType(string $returnType): static

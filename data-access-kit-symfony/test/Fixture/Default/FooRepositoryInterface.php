@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace DataAccessKit\Symfony\Fixture;
+namespace DataAccessKit\Symfony\Fixture\Default;
 
 use DataAccessKit\Repository\Attribute\Delegate;
 use DataAccessKit\Repository\Attribute\Repository;

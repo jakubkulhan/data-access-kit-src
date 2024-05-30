@@ -44,6 +44,7 @@ use function substr;
 
 class Compiler
 {
+	public const string PERSISTENCE_PROPERTY = "persistence";
 
 	/** @var array<string, MethodCompilerInterface> */
 	private array $methodCompilers = [];

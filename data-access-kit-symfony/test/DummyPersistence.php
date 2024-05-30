@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace DataAccessKit\Symfony\Fixture;
+namespace DataAccessKit\Symfony;
 
 use DataAccessKit\PersistenceInterface;
 use LogicException;

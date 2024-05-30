@@ -10,17 +10,20 @@ use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Compiler;
+use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\ValueConverterInterface;
+use Doctrine\DBAL\Connection;
 use LogicException;
-use ReflectionClass;
 use Symfony\Component\Config\ConfigCache;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\Config\Resource\ReflectionClassResource;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
+use function count;
 use function strtr;
 use function substr;
 use const DIRECTORY_SEPARATOR;
@@ -31,6 +34,27 @@ class DataAccessKitBundle extends AbstractBundle
 	{
 		$definition->rootNode()
 			->children()
+				->scalarNode("default_database")
+					->defaultValue(Repository::DEFAULT_DATABASE)
+					->info("Name of the default database.")
+				->end()
+				->arrayNode("databases")
+					->useAttributeAsKey("name")
+					->requiresAtLeastOneElement()
+					->defaultValue([
+						Repository::DEFAULT_DATABASE => [
+							"connection" => Connection::class,
+						],
+					])
+					->arrayPrototype()
+						->children()
+							->scalarNode("connection")
+								->isRequired()
+								->info("Database connection service.")
+							->end()
+						->end()
+					->end()
+				->end()
 				->scalarNode("name_converter")
 					->defaultValue(DefaultNameConverter::class)
 					->info("Name converter class to use. Class constructor must not have any parameters.")
@@ -59,23 +83,50 @@ class DataAccessKitBundle extends AbstractBundle
 	public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
 	{
 		$services = $container->services();
-		$services->set(Persistence::class)->autowire();
-		$services->alias(PersistenceInterface::class, Persistence::class);
+
+		$this->configureGlobalServices($config, $services);
+
+		$this->configureDatabaseServices($config, $services);
+
+		$this->configureRepositoryServices($config, $services, $builder);
+	}
+
+	private function persistenceId(string $name): string
+	{
+		return "data_access_kit.{$name}_persistence";
+	}
+
+	private function configureGlobalServices(array $config, ServicesConfigurator $services): void
+	{
+		$services->set($config["name_converter"])->autowire();
+		$services->alias(NameConverterInterface::class, $config["name_converter"]);
 
 		$services->set(Registry::class)->autowire();
 
-		$services->set(DefaultNameConverter::class)->autowire();
-		$services->alias(NameConverterInterface::class, DefaultNameConverter::class);
-
 		$services->set(DefaultValueConverter::class)->autowire();
 		$services->alias(ValueConverterInterface::class, DefaultValueConverter::class);
+	}
 
+	private function configureDatabaseServices(array $config, ServicesConfigurator $services): void
+	{
+		foreach ($config["databases"] as $name => $database) {
+			$services->set($this->persistenceId($name), Persistence::class)
+				->arg("\$connection", new Reference($database["connection"]))
+				->autowire();
+
+			if ($name === $config["default_database"]) {
+				$services->alias(PersistenceInterface::class, $this->persistenceId($name));
+			}
+		}
+	}
+
+	private function configureRepositoryServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
+	{
 		$nameConverter = new $config["name_converter"]();
 		$registry = new Registry($nameConverter);
 		$compiler = new Compiler($registry);
-
 		$outputDir = $builder->getParameterBag()->resolveValue("%kernel.cache_dir%") . DIRECTORY_SEPARATOR . "DataAccessKit";
-		$fs = new Filesystem();
+		$debug = $builder->getParameterBag()->resolveValue("%kernel.debug%");
 
 		foreach ($config["paths"] as $path) {
 			$finder = (new Finder())
@@ -89,31 +140,46 @@ class DataAccessKitBundle extends AbstractBundle
 
 			foreach ($finder as $file) {
 				$className = $path["namespace"] . "\\" . strtr(substr($file->getRelativePathname(), 0, -4 /* strlen(".php") */), DIRECTORY_SEPARATOR, "\\");
-				$rc = new ReflectionClass($className);
-				if (count($rc->getAttributes(Repository::class)) === 0) {
+				[$result, $fileName] = $this->compileRepository($className, $compiler, $builder, $outputDir, $debug);
+				if ($result === null) {
 					continue;
 				}
 
-				$result = $compiler->prepare($rc);
-				$cache = new ConfigCache(
-					$outputDir . DIRECTORY_SEPARATOR . strtr($result->getName(), "\\", DIRECTORY_SEPARATOR) . ".php",
-					$builder->getParameterBag()->resolveValue("%kernel.debug%"),
-				);
-				if (!$cache->isFresh()) {
-					$compiler->compile($result);
-					$metadata = [];
-					foreach ($result->dependencies as $dependency) {
-						$builder->addResource($metadata[] = new ReflectionClassResource($dependency));
-					}
-					$cache->write((string) $result, $metadata);
-				}
-				require_once $cache->getPath();
-
-				$services->set($result->getName(), $result->getName())
-					->file($cache->getPath())
+				$cfg = $services->set($result->getName(), $result->getName())
+					->file($fileName)
 					->autowire();
-				$services->alias($rc->getName(), $result->getName());
+				if ($result->hasMethod("__construct") && $result->method("__construct")->hasParameter(Compiler::PERSISTENCE_PROPERTY)) {
+					$cfg->arg('$' . Compiler::PERSISTENCE_PROPERTY, new Reference($this->persistenceId($result->repository->database)));
+				}
+				$services->alias($result->reflection->getName(), $result->getName());
 			}
 		}
 	}
+
+	private function compileRepository(string $className, Compiler $compiler, ContainerBuilder $builder, string $outputDir, bool $debug): array
+	{
+		try {
+			$result = $compiler->prepare($className);
+		} catch (CompilerException $e) {
+			return [null, null];
+		}
+
+		$cache = new ConfigCache(
+			$outputDir . DIRECTORY_SEPARATOR . strtr($result->getName(), "\\", DIRECTORY_SEPARATOR) . ".php",
+			$debug,
+		);
+		if (!$cache->isFresh()) {
+			$compiler->compile($result);
+			$metadata = [];
+			foreach ($result->dependencies as $dependency) {
+				$builder->addResource($metadata[] = new ReflectionClassResource($dependency));
+			}
+			$cache->write((string) $result, $metadata);
+		}
+		require_once $cache->getPath();
+		$fileName = $cache->getPath();
+
+		return [$result, $fileName];
+	}
+
 }
