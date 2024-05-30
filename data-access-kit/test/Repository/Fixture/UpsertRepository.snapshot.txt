@@ -23,13 +23,13 @@ final class UpsertRepository implements UpsertRepositoryInterface
 		array $foos,
 	): void
 	{
-		$this->persistence->upsertAll($foos);
+		$this->persistence->upsert($foos);
 	}
 
 	public function upsertTitleOnly(
 		array $foos,
 	): void
 	{
-		$this->persistence->upsertAll($foos, ['title']);
+		$this->persistence->upsert($foos, ['title']);
 	}
 }

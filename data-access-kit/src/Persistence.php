@@ -16,6 +16,7 @@ use function array_merge;
 use function count;
 use function implode;
 use function in_array;
+use function is_array;
 use function sprintf;
 use function var_dump;
 
@@ -58,27 +59,23 @@ class Persistence implements PersistenceInterface
 		return $this->connection->executeStatement($sql, $parameters);
 	}
 
-	public function insert(object $object): void
+	public function insert(object|array $data): void
 	{
-		$this->insertUpsertAll([$object], []);
+		if (!is_array($data)) {
+			$data = [$data];
+		}
+		$this->doInsert($data, []);
 	}
 
-	public function insertAll(array $objects): void
+	public function upsert(object|array $data, ?array $columns = null): void
 	{
-		$this->insertUpsertAll($objects, []);
+		if (!is_array($data)) {
+			$data = [$data];
+		}
+		$this->doInsert($data, $columns);
 	}
 
-	public function upsert(object $object, ?array $columns = null): void
-	{
-		$this->insertUpsertAll([$object], $columns);
-	}
-
-	public function upsertAll(array $objects, ?array $columns = null): void
-	{
-		$this->insertUpsertAll($objects, $columns);
-	}
-
-	private function insertUpsertAll(array $objects, ?array $upsertColumns = null): void
+	private function doInsert(array $objects, ?array $upsertColumns = null): void
 	{
 		if (count($objects) === 0) {
 			return;
@@ -289,18 +286,17 @@ class Persistence implements PersistenceInterface
 		);
 	}
 
-	public function delete(object $object): void
+	public function delete(object|array $data): void
 	{
-		$this->deleteAll([$object]);
-	}
+		if (!is_array($data)) {
+			$data = [$data];
+		}
 
-	public function deleteAll(array $objects): void
-	{
-		if (count($objects) === 0) {
+		if (count($data) === 0) {
 			return;
 		}
 
-		$table = $this->registry->get($objects[0], true);
+		$table = $this->registry->get($data[0], true);
 		$platform = $this->connection->getDatabasePlatform();
 
 		$where = [];
@@ -313,7 +309,7 @@ class Persistence implements PersistenceInterface
 			}
 		}
 
-		foreach ($objects as $object) {
+		foreach ($data as $object) {
 			$rowWhere = [];
 			foreach ($primaryColumns as $column) {
 				if (!$column->reflection->isInitialized($object)) {

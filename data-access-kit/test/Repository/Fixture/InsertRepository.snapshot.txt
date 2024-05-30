@@ -23,6 +23,6 @@ final class InsertRepository implements InsertRepositoryInterface
 		array $foos,
 	): void
 	{
-		$this->persistence->insertAll($foos);
+		$this->persistence->insert($foos);
 	}
 }

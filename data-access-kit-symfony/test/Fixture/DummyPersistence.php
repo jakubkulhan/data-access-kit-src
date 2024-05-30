@@ -22,37 +22,22 @@ class DummyPersistence implements PersistenceInterface
 		throw new LogicException("Not implemented");
 	}
 
-	public function insert(object $object): void
+	public function insert(object|array $data): void
 	{
 		throw new LogicException("Not implemented");
 	}
 
-	public function insertAll(array $objects): void
+	public function upsert(object|array $data, ?array $columns = null): void
 	{
 		throw new LogicException("Not implemented");
 	}
 
-	public function upsert(object $object, ?array $columns = null): void
+	public function update(object|array $data, ?array $columns = null): void
 	{
 		throw new LogicException("Not implemented");
 	}
 
-	public function upsertAll(array $objects, ?array $columns = null): void
-	{
-		throw new LogicException("Not implemented");
-	}
-
-	public function update(object $object, ?array $columns = null): void
-	{
-		throw new LogicException("Not implemented");
-	}
-
-	public function delete(object $object): void
-	{
-		throw new LogicException("Not implemented");
-	}
-
-	public function deleteAll(array $objects): void
+	public function delete(object|array $data): void
 	{
 		throw new LogicException("Not implemented");
 	}

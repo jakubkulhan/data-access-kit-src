@@ -209,7 +209,7 @@ class PersistenceTest extends TestCase
 		$user2->firstName = "David";
 		$user2->lastName = "White";
 
-		$this->persistence->insertAll([$user1, $user2]);
+		$this->persistence->insert([$user1, $user2]);
 
 		$this->assertEquals(3, $user1->id);
 		$this->assertEquals(4, $user2->id);
@@ -233,7 +233,7 @@ class PersistenceTest extends TestCase
 
 		$this->expectException(PersistenceException::class);
 		$this->expectExceptionMessage("does not support INSERT ... RETURNING");
-		$this->persistence->insertAll([$user1, $user2]);
+		$this->persistence->insert([$user1, $user2]);
 	}
 
 	public function testUpsert(): void

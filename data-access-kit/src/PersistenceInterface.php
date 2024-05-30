@@ -34,48 +34,33 @@ interface PersistenceInterface
 	public function execute(string $sql, array $parameters = []): int;
 
 	/**
-	 * Insert $object into the database.
-	 */
-	public function insert(object $object): void;
-
-	/**
-	 * Insert all $objects into the database.
+	 * Insert data into the database.
 	 *
 	 * @template T
-	 * @param T[] $objects
+	 * @param T|T[] $data
 	 */
-	public function insertAll(array $objects): void;
+	public function insert(object|array $data): void;
 
 	/**
-	 * Insert or update $object in the database.
-	 */
-	public function upsert(object $object, ?array $columns = null): void;
-
-	/**
-	 * Insert or update all $objects in the database.
+	 * Insert or update data in the database.
 	 *
 	 * @template T
-	 * @param T[] $objects
+	 * @param T|T[] $data
 	 */
-	public function upsertAll(array $objects, ?array $columns = null): void;
+	public function upsert(object|array $data, ?array $columns = null): void;
 
 	/**
-	 * Update $object in the database based on its primary key.
+	 * Update data in the database based on its primary key.
 	 */
-	public function update(object $object, ?array $columns = null): void;
+	public function update(object $data, ?array $columns = null): void;
 
 	/**
-	 * Delete $object from the database based on its primary key.
-	 */
-	public function delete(object $object): void;
-
-	/**
-	 * Delete all $objects from the database based on their primary keys.
+	 * Delete data from the database based on its primary key.
 	 *
 	 * @template T
-	 * @param T[] $objects
+	 * @param T|T[] $data
 	 */
-	public function deleteAll(array $objects): void;
+	public function delete(object|array $data): void;
 
 	/**
 	 * Convert $object to an associative array.

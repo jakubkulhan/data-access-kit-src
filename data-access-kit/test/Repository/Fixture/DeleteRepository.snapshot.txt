@@ -23,6 +23,6 @@ final class DeleteRepository implements DeleteRepositoryInterface
 		array $foos,
 	): void
 	{
-		$this->persistence->deleteAll($foos);
+		$this->persistence->delete($foos);
 	}
 }

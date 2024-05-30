@@ -76,7 +76,6 @@ class ManipulationMethodCompiler implements MethodCompilerInterface
 
 		$method->line(
 			"\$this->persistence->{$persistenceMethod}" .
-			($rp->getType()->getName() === "array" ? "All" : "") .
 			"(\${$rp->getName()}" .
 			(property_exists($attribute, "columns") && $attribute->columns !== null ? ", " . Compiler::varExport($attribute->columns) : "") .
 			");",
