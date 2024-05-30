@@ -1,0 +1,2 @@
+INSERT INTO `users` (`first_name`, `last_name`) VALUES (?, ?) RETURNING `user_id`, `full_name`;
+SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = ?;

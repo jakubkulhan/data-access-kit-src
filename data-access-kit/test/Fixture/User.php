@@ -12,4 +12,8 @@ class User
 	public int $id;
 	#[Column]
 	public string $firstName;
+	#[Column]
+	public string $lastName;
+	#[Column(generated: true)]
+	public string $fullName;
 }
