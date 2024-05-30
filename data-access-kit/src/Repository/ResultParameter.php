@@ -9,12 +9,12 @@ use function implode;
 class ResultParameter implements Stringable
 {
 
-	public string $visibility = "";
-	public string $type = "";
-	public mixed $defaultValue = null;
+	private string $visibility = "";
+	private string $type = "";
+	private mixed $defaultValue = null;
 	private bool $hasDefaultValue = false;
 	/** @var array<string, ResultAttribute> */
-	public array $attributes = [];
+	private array $attributes = [];
 
 	public function __construct(
 		public readonly string $name,

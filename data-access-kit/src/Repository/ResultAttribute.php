@@ -9,7 +9,7 @@ class ResultAttribute implements Stringable
 {
 
 	/** @var array<int|string, mixed> */
-	public array $arguments = [];
+	private array $arguments = [];
 
 	public function __construct(
 		public readonly string $name,

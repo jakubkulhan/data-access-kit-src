@@ -7,8 +7,8 @@ use Stringable;
 class ResultProperty implements Stringable
 {
 
-	public string $visibility = "public";
-	public string $type = "";
+	private string $visibility = "public";
+	private string $type = "";
 
 	public function __construct(
 		public readonly string $name,
