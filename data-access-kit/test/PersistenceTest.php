@@ -27,7 +27,6 @@ use function implode;
 use function iterator_to_array;
 use function sprintf;
 use function str_replace;
-use function var_dump;
 use const DIRECTORY_SEPARATOR;
 
 #[Group("database")]
@@ -294,6 +293,35 @@ class PersistenceTest extends TestCase
 		$user->lastName = "Brown";
 		$this->persistence->update($user);
 		$this->assertEquals("Charlie Brown", $user->fullName);
+
+		$this->assertQueriesSnapshot();
+	}
+
+	public function testDelete(): void
+	{
+		$user = new User();
+		$user->id = 1;
+		$this->persistence->delete($user);
+
+		$selectUsers = iterator_to_array($this->persistence->select(User::class, "SELECT user_id FROM users"));
+		$this->assertCount(1, $selectUsers);
+		$this->assertEquals(2, $selectUsers[0]->id);
+
+		$this->assertQueriesSnapshot();
+	}
+
+	public function testDeleteAll(): void
+	{
+		$user1 = new User();
+		$user1->id = 1;
+
+		$user2 = new User();
+		$user2->id = 2;
+
+		$this->persistence->delete([$user1, $user2]);
+
+		$selectUsers = iterator_to_array($this->persistence->select(User::class, "SELECT user_id FROM users"));
+		$this->assertCount(0, $selectUsers);
 
 		$this->assertQueriesSnapshot();
 	}
