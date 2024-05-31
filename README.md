@@ -11,12 +11,6 @@
 
 This is the main source repository. Other repositories are automatically split from this one. Please open issues and pull requests here.
 
-### Testing
-
-```shell
-composer test
-```
-
 ## License
 
 Licensed under MIT license. See [LICENSE](LICENSE).

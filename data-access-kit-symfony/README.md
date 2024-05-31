@@ -20,10 +20,10 @@ Then configure paths to your repository classes in `config/packages/data_access_
 
 ```yaml
 data_access_kit:
-  paths:
-    # the code must be structured in PSR-4 way
-    - path: %kernel.project_dir%/src/Repository
-      namespace: App\Repository
+  repositories:
+    # similar to how autoload in composer.json works
+    App\Repository\:
+      path: %kernel.project_dir%/src/Repository
 ```
 
 And that's it! Follow repositories [quick start](https://github.com/jakubkulhan/data-access-kit#quick-start) to learn more.
@@ -38,6 +38,26 @@ composer require data-access-kit/data-access-kit-symfony@dev-main
 
 - PHP 8.3 or higher.
 - Symfony 7.0 or higher.
+
+## Configuration
+
+```yaml
+data_access_kit:
+  default_database: default # this database Persistence will be aliased to PersistenceInterface
+  databases:
+    default:
+      connection: doctrine.dbal.default_connection # service reference to Doctrine\DBAL\Connection
+    other:
+      connection: doctrine.dbal.other_connection
+  repositories:
+    App\Repository: # namespace prefix
+      path: %kernel.project_dir%/src/Repository # path to repository classes
+      exclude: # excluded file paths, you can use glob patterns
+        - Support/**
+        - Tests/**
+  name_converter: DataAccessKit\Converter\DefaultNameConverter # service reference to NameConverterInterface, if the service doesn't exist, the string is considered to be a class name and a service is added to the container
+  value_converter: DataAccessKit\Converter\DefaultValueConverter # service reference to ValueConverterInterface, the same behavior as with name_converter
+```
 
 ## Contributing
 

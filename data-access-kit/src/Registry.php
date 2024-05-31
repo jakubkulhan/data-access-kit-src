@@ -9,8 +9,10 @@ use Doctrine\Common\Annotations\PhpParser;
 use LogicException;
 use ReflectionClass;
 use ReflectionNamedType;
+use function in_array;
 use function preg_match;
 use function sprintf;
+use function str_contains;
 use function strtolower;
 
 class Registry
@@ -76,7 +78,9 @@ class Registry
 			}
 			if ($rp->getType() instanceof ReflectionNamedType &&
 				$rp->getType()->getName() === "array" &&
-				preg_match(
+				str_contains($rp->getDocComment() ?: "", "@var")
+			) {
+				if (preg_match(
 					'/@var\s+\??(?:
 						(?:array|list)<\s*(?:[^,>]+,\s*)?(?P<arrayValueType>[^,>]+)>
 						|
@@ -84,22 +88,31 @@ class Registry
 					)(?:\|null)?\s+/xi',
 					$rp->getDocComment() ?: "",
 					$m,
-				)
-			) {
-				if (!empty($m["arrayValueType"])) {
-					$itemType = $m["arrayValueType"];
-				} else if (!empty($m["itemType"])) {
-					$itemType = $m["itemType"];
+				)) {
+					if (!empty($m["arrayValueType"])) {
+						$itemType = $m["arrayValueType"];
+					} else if (!empty($m["itemType"])) {
+						$itemType = $m["itemType"];
+					} else {
+						throw new LogicException("Unreachable statement.");
+					}
+					if (!in_array($itemType, ["int", "float", "string", "bool"], true)) {
+						$useStatements = $this->phpParser->parseUseStatements($rc);
+						if (isset($useStatements[strtolower($itemType)])) {
+							$itemType = $useStatements[strtolower($itemType)];
+						} else {
+							$itemType = $rc->getNamespaceName() . "\\" . $itemType;
+						}
+						$column->itemType = $itemType;
+					}
+
 				} else {
-					throw new LogicException("Unreachable statement.");
+					throw new LogicException(sprintf(
+						"Property [%s::%s] is of type array, doc comment contains @var annotation, but the item type could not be parsed.",
+						$className,
+						$rp->getName(),
+					));
 				}
-				$useStatements = $this->phpParser->parseUseStatements($rc);
-				if (isset($useStatements[strtolower($itemType)])) {
-					$itemType = $useStatements[strtolower($itemType)];
-				} else {
-					$itemType = $rc->getNamespaceName() . "\\" . $itemType;
-				}
-				$column->itemType = $itemType;
 			}
 
 			$column->setReflection($rp);
