@@ -14,6 +14,7 @@ class Column
 		public ?string $name = null,
 		public bool $primary = false,
 		public bool $generated = false,
+		public ?string $itemType = null,
 	)
 	{
 	}

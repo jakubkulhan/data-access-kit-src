@@ -2,16 +2,16 @@
 
 namespace DataAccessKit\Symfony;
 
-use DataAccessKit\DefaultNameConverter;
-use DataAccessKit\DefaultValueConverter;
-use DataAccessKit\NameConverterInterface;
+use DataAccessKit\Converter\DefaultNameConverter;
+use DataAccessKit\Converter\DefaultValueConverter;
+use DataAccessKit\Converter\NameConverterInterface;
+use DataAccessKit\Converter\ValueConverterInterface;
 use DataAccessKit\Persistence;
 use DataAccessKit\PersistenceInterface;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Repository;
 use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Repository\Exception\CompilerException;
-use DataAccessKit\ValueConverterInterface;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\Config\ConfigCache;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;

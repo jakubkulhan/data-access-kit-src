@@ -2,13 +2,10 @@
 
 namespace DataAccessKit\Repository;
 
-use DataAccessKit\DefaultNameConverter;
+use DataAccessKit\Converter\DefaultNameConverter;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Fixture\AbsoluteSQLFileRepositoryInterface;
-use DataAccessKit\Repository\Fixture\VariableArrayDocCommentMissingParamSQLRepositoryInterface;
-use DataAccessKit\Repository\Fixture\VariableArrayNoDocCommentSQLRepositoryInterface;
-use DataAccessKit\Repository\Fixture\VariableArraySQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountBadReturnTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\CountRepositoryInterface;
@@ -69,6 +66,9 @@ use DataAccessKit\Repository\Fixture\UpsertBadParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpsertRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpsertReturnTypeNonVoidRepositoryInterface;
 use DataAccessKit\Repository\Fixture\UpsertTooManyParametersRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArrayDocCommentMissingParamSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArrayNoDocCommentSQLRepositoryInterface;
+use DataAccessKit\Repository\Fixture\VariableArraySQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VariableSQLRepositoryInterface;
 use DataAccessKit\Repository\Fixture\VoidSQLRepositoryInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -77,7 +77,6 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Spatie\Snapshots\MatchesSnapshots;
 use function dirname;
-use function lcfirst;
 use function sprintf;
 use function str_replace;
 use function strrpos;

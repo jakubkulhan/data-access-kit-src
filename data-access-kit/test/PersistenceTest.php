@@ -2,6 +2,8 @@
 
 namespace DataAccessKit;
 
+use DataAccessKit\Converter\DefaultNameConverter;
+use DataAccessKit\Converter\DefaultValueConverter;
 use DataAccessKit\Exception\PersistenceException;
 use DataAccessKit\Fixture\User;
 use Doctrine\DBAL\Configuration;

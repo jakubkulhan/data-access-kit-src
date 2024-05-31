@@ -3,6 +3,7 @@
 namespace DataAccessKit;
 
 use DataAccessKit\Attribute\Column;
+use DataAccessKit\Converter\ValueConverterInterface;
 use DataAccessKit\Exception\PersistenceException;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;

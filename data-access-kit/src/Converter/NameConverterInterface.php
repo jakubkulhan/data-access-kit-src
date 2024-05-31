@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-namespace DataAccessKit;
+namespace DataAccessKit\Converter;
 
 use ReflectionClass;
 use ReflectionProperty;

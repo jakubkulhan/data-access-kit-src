@@ -2,9 +2,10 @@
 
 namespace DataAccessKit;
 
-use LogicException;
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
+use DataAccessKit\Converter\NameConverterInterface;
+use LogicException;
 use ReflectionClass;
 use function sprintf;
 
@@ -32,6 +33,12 @@ class Registry
 		}
 
 		$rc = new ReflectionClass($className);
+		if ($rc->isTrait() || $rc->isInterface() || $rc->isAbstract()) {
+			throw new LogicException(sprintf(
+				"Class [%s] must be concrete.",
+				$className,
+			));
+		}
 		$tableRA = $rc->getAttributes(Table::class)[0] ?? null;
 		if ($tableRA === null) {
 			if ($requireTable) {
@@ -75,6 +82,15 @@ class Registry
 		$table->setColumns($columns);
 
 		return $this->tablesByClassName[$className] = $table;
+	}
+
+	public function maybeGet(object|string $objectOrClass, bool $requireTable = false): ?Table
+	{
+		try {
+			return $this->get(...func_get_args());
+		} catch (LogicException) {
+			return null;
+		}
 	}
 
 	private static function missingTableException(object|string $className): LogicException
