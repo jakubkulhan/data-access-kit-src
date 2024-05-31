@@ -31,7 +31,7 @@ class DefaultValueConverter implements ValueConverterInterface
 	{
 	}
 
-	public function objectToDatabase(Table $table, Column $column, mixed $value): mixed
+	public function objectToDatabase(Table $table, Column $column, mixed $value, bool $encode = true): mixed
 	{
 		if ($value === null) {
 			return null;
@@ -49,12 +49,12 @@ class DefaultValueConverter implements ValueConverterInterface
 			$valueType = $column->reflection->getType();
 			if ($valueType instanceof ReflectionNamedType) {
 				if (in_array($valueType->getName(), ["int", "float", "string", "bool"], true)) {
-					// passthrough
+					$returnValue = $value;
 				} else if ($valueType->getName() === "object") {
-					$value = json_encode($value);
+					$returnValue = $encode ? json_encode($value) : $value;
 				} else if ($valueType->getName() === "array") {
 					if ($column->itemType === null) {
-						$value = json_encode($value);
+						$returnValue = $encode ? json_encode($value) : $value;
 					} else {
 						$nestedTable = $this->registry->get($column->itemType);
 						$jsonArray = [];
@@ -65,14 +65,15 @@ class DefaultValueConverter implements ValueConverterInterface
 									$nestedTable,
 									$nestedColumn,
 									$nestedColumn->reflection->getValue($item),
+									false,
 								);
 							}
 						}
-						$value = json_encode($jsonArray);
+						$returnValue = $encode ? json_encode($jsonArray) : $jsonArray;
 					}
 				} else if (in_array($valueType->getName(), [DateTime::class, DateTimeImmutable::class], true)) {
 					/** @var DateTime|DateTimeImmutable $value */
-					$value = (clone $value)->setTimezone($this->dateTimeZone)->format($this->dateTimeFormat);
+					$returnValue = (clone $value)->setTimezone($this->dateTimeZone)->format($this->dateTimeFormat);
 				} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
 					$jsonObject = new stdClass();
 					foreach ($nestedTable->columns as $nestedColumn) {
@@ -80,9 +81,10 @@ class DefaultValueConverter implements ValueConverterInterface
 							$nestedTable,
 							$nestedColumn,
 							$nestedColumn->reflection->getValue($value),
+							false,
 						);
 					}
-					$value = json_encode($jsonObject);
+					$returnValue = $encode ? json_encode($jsonObject) : $jsonObject;
 				} else {
 					throw new ConverterException(sprintf(
 						"Unsupported type [%s] of property [%s::\$%s].",
@@ -99,7 +101,7 @@ class DefaultValueConverter implements ValueConverterInterface
 				));
 			}
 
-			return $value;
+			return $returnValue;
 
 		} finally {
 			if ($recursionGuardKey !== null) {
@@ -108,7 +110,7 @@ class DefaultValueConverter implements ValueConverterInterface
 		}
 	}
 
-	public function databaseToObject(Table $table, Column $column, mixed $value): mixed
+	public function databaseToObject(Table $table, Column $column, mixed $value, bool $decode = true): mixed
 	{
 		if ($value === null) {
 			return null;
@@ -117,41 +119,51 @@ class DefaultValueConverter implements ValueConverterInterface
 		$valueType = $column->reflection->getType();
 		if ($valueType instanceof ReflectionNamedType) {
 			if (in_array($valueType->getName(), ["int", "float", "string", "bool"], true)) {
-				// passthrough
+				$returnValue = $value;
 			} else if ($valueType->getName() === "object") {
-				$value = json_decode($value);
+				$returnValue = $decode ? json_decode($value) : $value;
 			} else if ($valueType->getName() === "array") {
 				if ($column->itemType === null) {
-					$value = json_decode($value);
+					$returnValue = $decode ? json_decode($value) : $value;
 				} else {
 					$nestedTable = $this->registry->get($column->itemType);
 					$array = [];
-					foreach (json_decode($value) as $jsonObject) {
+					foreach ($decode ? json_decode($value) : $value as $jsonObject) {
 						$nestedObject = $nestedTable->reflection->newInstanceWithoutConstructor();
 						foreach ($nestedTable->columns as $nestedColumn) {
 							$nestedColumn->reflection->setValue(
 								$nestedObject,
-								$this->databaseToObject($nestedTable, $nestedColumn, $jsonObject->{$nestedColumn->name}),
+								$this->databaseToObject(
+									$nestedTable,
+									$nestedColumn,
+									$jsonObject->{$nestedColumn->name},
+									false,
+								),
 							);
 						}
 						$array[] = $nestedObject;
 					}
-					$value = $array;
+					$returnValue = $array;
 				}
 			} else if ($valueType->getName() === DateTime::class) {
-				$value = DateTime::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
+				$returnValue = DateTime::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
 			} else if ($valueType->getName() === DateTimeImmutable::class) {
-				$value = DateTimeImmutable::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
+				$returnValue = DateTimeImmutable::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
 			} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
-				$jsonObject = json_decode($value);
+				$jsonObject = $decode ? json_decode($value) : $value;
 				$nestedObject = $nestedTable->reflection->newInstanceWithoutConstructor();
 				foreach ($nestedTable->columns as $nestedColumn) {
 					$nestedColumn->reflection->setValue(
 						$nestedObject,
-						$this->databaseToObject($nestedTable, $nestedColumn, $jsonObject->{$nestedColumn->name}),
+						$this->databaseToObject(
+							$nestedTable,
+							$nestedColumn,
+							$jsonObject->{$nestedColumn->name},
+							false,
+						),
 					);
 				}
-				$value = $nestedObject;
+				$returnValue = $nestedObject;
 			} else {
 				throw new ConverterException(sprintf(
 					"Unsupported type [%s] of property [%s::\$%s].",
@@ -168,6 +180,6 @@ class DefaultValueConverter implements ValueConverterInterface
 			));
 		}
 
-		return $value;
+		return $returnValue;
 	}
 }

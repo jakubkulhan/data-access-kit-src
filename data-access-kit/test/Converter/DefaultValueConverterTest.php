@@ -4,6 +4,7 @@ namespace DataAccessKit\Converter;
 
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
+use DataAccessKit\Converter\Fixture\DeepNestedObject;
 use DataAccessKit\Converter\Fixture\NestedObject;
 use DataAccessKit\Registry;
 use DateTime;
@@ -96,6 +97,9 @@ class DefaultValueConverterTest extends TestCase
 			/** @var NestedObject[] */ #[Column] public array $nestedArrayDoc;
 			/** @var NestedObject[]|null */ #[Column] public ?array $nullableNestedArrayDocNull;
 			/** @var NestedObject[]|null */ #[Column] public ?array $nullableNestedArrayDocNotNull;
+			#[Column] public DeepNestedObject $deepNestedObject;
+			#[Column] public ?DeepNestedObject $nullableDeepNestedObjectNull;
+			#[Column] public ?DeepNestedObject $nullableDeepNestedObjectNotNull;
 		});
 
 		$data = [
@@ -132,6 +136,9 @@ class DefaultValueConverterTest extends TestCase
 			"nestedArrayDoc" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
 			"nullableNestedArrayDocNull" => [null, null],
 			"nullableNestedArrayDocNotNull" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
+			"deepNestedObject" => [new DeepNestedObject(new DeepNestedObject()), '{"nested":{"nested":null}}'],
+			"nullableDeepNestedObjectNull" => [null, null],
+			"nullableDeepNestedObjectNotNull" => [new DeepNestedObject(new DeepNestedObject()), '{"nested":{"nested":null}}'],
 		];
 		foreach ($data as $columnName => [$objectValue, $databaseValue]) {
 			yield $columnName => [$table, $table->columns[$columnName], $objectValue, $databaseValue];
