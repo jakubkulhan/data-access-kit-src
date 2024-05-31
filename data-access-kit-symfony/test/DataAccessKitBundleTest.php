@@ -90,10 +90,9 @@ class DataAccessKitBundleTest extends TestCase
 			);
 
 			$container->loadFromExtension("data_access_kit", [
-				"paths" => [
-					[
+				"repositories" => [
+					(new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Default" => [
 						"path" => __DIR__ . "/Fixture/Default",
-						"namespace" => (new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Default",
 					],
 				],
 			]);
@@ -146,14 +145,12 @@ class DataAccessKitBundleTest extends TestCase
 						"connection" => "doctrine.dbal.other_connection",
 					],
 				],
-				"paths" => [
-					[
+				"repositories" => [
+					(new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Default" => [
 						"path" => __DIR__ . "/Fixture/Default",
-						"namespace" => (new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Default",
 					],
-					[
+					(new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Other" => [
 						"path" => __DIR__ . "/Fixture/Other",
-						"namespace" => (new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Other",
 					]
 				],
 			]);

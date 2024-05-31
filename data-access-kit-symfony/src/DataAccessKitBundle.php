@@ -24,6 +24,7 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
 use function count;
+use function rtrim;
 use function strtr;
 use function substr;
 use const DIRECTORY_SEPARATOR;
@@ -59,18 +60,18 @@ class DataAccessKitBundle extends AbstractBundle
 					->defaultValue(DefaultNameConverter::class)
 					->info("Name converter class to use. Class constructor must not have any parameters.")
 				->end()
-				->arrayNode("paths")
+				->arrayNode("repositories")
+					->useAttributeAsKey("namespace")
+					->requiresAtLeastOneElement()
+					->defaultValue([])
 					->arrayPrototype()
 						->children()
 							->scalarNode("path")
 								->isRequired()
 								->info("Path to the PSR-4 directory containing the classes.")
 							->end()
-							->scalarNode("namespace")
-								->isRequired()
-								->info("Namespace of the classes in the path.")
-							->end()
-								->arrayNode("exclude")
+							->arrayNode("exclude")
+								->defaultValue([])
 								->scalarPrototype()->end()
 								->info("List of file patterns to exclude.")
 							->end()
@@ -128,18 +129,18 @@ class DataAccessKitBundle extends AbstractBundle
 		$outputDir = $builder->getParameterBag()->resolveValue("%kernel.cache_dir%") . DIRECTORY_SEPARATOR . "DataAccessKit";
 		$debug = $builder->getParameterBag()->resolveValue("%kernel.debug%");
 
-		foreach ($config["paths"] as $path) {
+		foreach ($config["repositories"] as $namespace => $repository) {
 			$finder = (new Finder())
-				->in($path["path"])
+				->in($repository["path"])
 				->files()
 				->name("*.php");
 
-			if (count($path["exclude"]) > 0) {
+			if (count($repository["exclude"]) > 0) {
 				throw new LogicException("TODO: exclude");
 			}
 
 			foreach ($finder as $file) {
-				$className = $path["namespace"] . "\\" . strtr(substr($file->getRelativePathname(), 0, -4 /* strlen(".php") */), DIRECTORY_SEPARATOR, "\\");
+				$className = rtrim($namespace, "\\") . "\\" . strtr(substr($file->getRelativePathname(), 0, -4 /* strlen(".php") */), DIRECTORY_SEPARATOR, "\\");
 				[$result, $fileName] = $this->compileRepository($className, $compiler, $builder, $outputDir, $debug);
 				if ($result === null) {
 					continue;
