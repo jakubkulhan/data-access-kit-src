@@ -62,7 +62,8 @@ class PersistenceTest extends TestCase
 			(new DsnParser())->parse(getenv("DATABASE_URL")),
 			(new Configuration())->setMiddlewares([new Middleware($this->queryLogger)])
 		);
-		$this->persistence = new Persistence($this->connection, new Registry(new DefaultNameConverter()), new DefaultValueConverter());
+		$registry = new Registry(new DefaultNameConverter());
+		$this->persistence = new Persistence($this->connection, $registry, new DefaultValueConverter($registry));
 
 		$this->setUpUsersTable();
 	}
