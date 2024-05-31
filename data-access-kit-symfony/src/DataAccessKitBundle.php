@@ -13,7 +13,6 @@ use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\ValueConverterInterface;
 use Doctrine\DBAL\Connection;
-use LogicException;
 use Symfony\Component\Config\ConfigCache;
 use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
 use Symfony\Component\Config\Resource\ReflectionClassResource;
@@ -136,7 +135,7 @@ class DataAccessKitBundle extends AbstractBundle
 				->name("*.php");
 
 			if (count($repository["exclude"]) > 0) {
-				throw new LogicException("TODO: exclude");
+				$finder->notName($repository["exclude"]);
 			}
 
 			foreach ($finder as $file) {

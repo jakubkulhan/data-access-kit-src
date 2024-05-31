@@ -7,6 +7,8 @@ use DataAccessKit\Repository\Compiler;
 use DataAccessKit\Symfony\Fixture\Default\FooRepository;
 use DataAccessKit\Symfony\Fixture\Default\FooRepositoryInterface;
 use DataAccessKit\Symfony\Fixture\Default\FooService;
+use DataAccessKit\Symfony\Fixture\Exclude\BazRepositoryInterface;
+use DataAccessKit\Symfony\Fixture\Exclude\BazService;
 use DataAccessKit\Symfony\Fixture\Other\BarEmptyRepositoryInterface;
 use DataAccessKit\Symfony\Fixture\Other\BarRepositoryInterface;
 use DataAccessKit\Symfony\Fixture\Other\BarService;
@@ -110,6 +112,54 @@ class DataAccessKitBundleTest extends TestCase
 			/** @var FooService $fooService */
 			$fooService = $kernel->getContainer()->get(FooService::class);
 			$this->assertInstanceOf(FooRepositoryInterface::class, $fooService->fooRepository);
+
+		} finally {
+			(new Filesystem())->remove($kernel->getProjectDir());
+		}
+	}
+
+	public function testExclude(): void
+	{
+
+		$kernel = $this->createKernel(function (ContainerBuilder $container) {
+			$container->setDefinition(Connection::class, $this->createDummyConnectionDefinition());
+
+			$container->setDefinition(
+				BazService::class,
+				(new Definition(BazService::class))
+					->setAutowired(true)
+					->setPublic(true),
+			);
+
+			$container->loadFromExtension("data_access_kit", [
+				"repositories" => [
+					(new ReflectionClass(DataAccessKitBundleTest::class))->getNamespaceName() . "\\Fixture\\Exclude" => [
+						"path" => __DIR__ . "/Fixture/Exclude",
+						"exclude" => [
+							"BazExcludedRepositoryInterface.php",
+						],
+					],
+				],
+			]);
+		});
+		try {
+			$repositoryFile = $kernel->getProjectDir() . "/var/cache/test/DataAccessKit/DataAccessKit/Symfony/Fixture/Exclude/BazRepository.php";
+			$this->assertFileDoesNotExist($repositoryFile);
+
+			$excludedRepositoryFile = $kernel->getProjectDir() . "/var/cache/test/DataAccessKit/DataAccessKit/Symfony/Fixture/Exclude/BazExcludedRepository.php";
+			$this->assertFileDoesNotExist($excludedRepositoryFile);
+
+			$kernel->boot();
+
+			$this->assertFileExists($repositoryFile);
+			$this->assertFileExists($repositoryFile . ".meta");
+
+			$this->assertFileDoesNotExist($excludedRepositoryFile);
+			$this->assertFileDoesNotExist($excludedRepositoryFile . ".meta");
+
+			/** @var BazService $bazService */
+			$bazService = $kernel->getContainer()->get(BazService::class);
+			$this->assertInstanceOf(BazRepositoryInterface::class, $bazService->bazRepository);
 
 		} finally {
 			(new Filesystem())->remove($kernel->getProjectDir());
