@@ -5,9 +5,13 @@ namespace DataAccessKit;
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
 use DataAccessKit\Converter\NameConverterInterface;
+use Doctrine\Common\Annotations\PhpParser;
 use LogicException;
 use ReflectionClass;
+use ReflectionNamedType;
+use function preg_match;
 use function sprintf;
+use function strtolower;
 
 class Registry
 {
@@ -15,10 +19,13 @@ class Registry
 	/** @var array<string, Table> */
 	private array $tablesByClassName = [];
 
+	private PhpParser $phpParser;
+
 	public function __construct(
 		private readonly NameConverterInterface $nameConverter,
 	)
 	{
+		$this->phpParser = new PhpParser();
 	}
 
 	public function get(object|string $objectOrClass, bool $requireTable = false): Table
@@ -67,6 +74,34 @@ class Registry
 			if ($column->name === null) {
 				$column->name = $this->nameConverter->propertyToColumn($rp);
 			}
+			if ($rp->getType() instanceof ReflectionNamedType &&
+				$rp->getType()->getName() === "array" &&
+				preg_match(
+					'/@var\s+\??(?:
+						(?:array|list)<\s*(?:[^,>]+,\s*)?(?P<arrayValueType>[^,>]+)>
+						|
+						(?P<itemType>[^[]+)\[]
+					)(?:\|null)?\s+/xi',
+					$rp->getDocComment() ?: "",
+					$m,
+				)
+			) {
+				if (!empty($m["arrayValueType"])) {
+					$itemType = $m["arrayValueType"];
+				} else if (!empty($m["itemType"])) {
+					$itemType = $m["itemType"];
+				} else {
+					throw new LogicException("Unreachable statement.");
+				}
+				$useStatements = $this->phpParser->parseUseStatements($rc);
+				if (isset($useStatements[strtolower($itemType)])) {
+					$itemType = $useStatements[strtolower($itemType)];
+				} else {
+					$itemType = $rc->getNamespaceName() . "\\" . $itemType;
+				}
+				$column->itemType = $itemType;
+			}
+
 			$column->setReflection($rp);
 			$columns[$column->name] = $column;
 		}

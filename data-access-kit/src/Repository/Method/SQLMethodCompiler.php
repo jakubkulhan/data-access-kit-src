@@ -30,6 +30,7 @@ use function preg_quote;
 use function preg_replace_callback;
 use function preg_split;
 use function sprintf;
+use function strtolower;
 use function ucfirst;
 
 /**
@@ -92,8 +93,8 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				}
 
 				$useStatements = $this->phpParser->parseUseStatements($result->reflection);
-				if (isset($useStatements[$phpType])) {
-					$phpType = $result->use($useStatements[$phpType]);
+				if (isset($useStatements[strtolower($phpType)])) {
+					$phpType = $result->use($useStatements[strtolower($phpType)]);
 				} else if (!ctype_lower($phpType[0])) {
 					$phpType = $result->use($phpType);
 				}

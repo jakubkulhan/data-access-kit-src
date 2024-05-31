@@ -93,6 +93,9 @@ class DefaultValueConverterTest extends TestCase
 			#[Column(itemType: NestedObject::class)] public array $nestedArray;
 			#[Column(itemType: NestedObject::class)] public ?array $nullableNestedArrayNull;
 			#[Column(itemType: NestedObject::class)] public ?array $nullableNestedArrayNotNull;
+			/** @var NestedObject[] */ #[Column] public array $nestedArrayDoc;
+			/** @var NestedObject[]|null */ #[Column] public ?array $nullableNestedArrayDocNull;
+			/** @var NestedObject[]|null */ #[Column] public ?array $nullableNestedArrayDocNotNull;
 		});
 
 		$data = [
@@ -126,6 +129,9 @@ class DefaultValueConverterTest extends TestCase
 			"nestedArray" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
 			"nullableNestedArrayNull" => [null, null],
 			"nullableNestedArrayNotNull" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
+			"nestedArrayDoc" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
+			"nullableNestedArrayDocNull" => [null, null],
+			"nullableNestedArrayDocNotNull" => [[new NestedObject("value1"), new NestedObject("value2")], '[{"key":"value1"},{"key":"value2"}]'],
 		];
 		foreach ($data as $columnName => [$objectValue, $databaseValue]) {
 			yield $columnName => [$table, $table->columns[$columnName], $objectValue, $databaseValue];
