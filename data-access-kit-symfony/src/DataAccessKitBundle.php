@@ -59,6 +59,10 @@ class DataAccessKitBundle extends AbstractBundle
 					->defaultValue(DefaultNameConverter::class)
 					->info("Name converter class to use. Class constructor must not have any parameters.")
 				->end()
+			->scalarNode("value_converter")
+			->defaultValue(DefaultValueConverter::class)
+			->info("Value converter class or service to use.")
+			->end()
 				->arrayNode("repositories")
 					->useAttributeAsKey("namespace")
 					->requiresAtLeastOneElement()
@@ -84,7 +88,7 @@ class DataAccessKitBundle extends AbstractBundle
 	{
 		$services = $container->services();
 
-		$this->configureGlobalServices($config, $services);
+		$this->configureGlobalServices($config, $services, $builder);
 
 		$this->configureDatabaseServices($config, $services);
 
@@ -96,15 +100,17 @@ class DataAccessKitBundle extends AbstractBundle
 		return "data_access_kit.{$name}_persistence";
 	}
 
-	private function configureGlobalServices(array $config, ServicesConfigurator $services): void
+	private function configureGlobalServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
 	{
 		$services->set($config["name_converter"])->autowire();
 		$services->alias(NameConverterInterface::class, $config["name_converter"]);
 
 		$services->set(Registry::class)->autowire();
 
-		$services->set(DefaultValueConverter::class)->autowire();
-		$services->alias(ValueConverterInterface::class, DefaultValueConverter::class);
+		if (!$builder->hasDefinition($config["value_converter"])) {
+			$services->set($config["value_converter"])->autowire();
+		}
+		$services->alias(ValueConverterInterface::class, $config["value_converter"]);
 	}
 
 	private function configureDatabaseServices(array $config, ServicesConfigurator $services): void
