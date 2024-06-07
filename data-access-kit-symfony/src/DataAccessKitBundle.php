@@ -59,10 +59,10 @@ class DataAccessKitBundle extends AbstractBundle
 					->defaultValue(DefaultNameConverter::class)
 					->info("Name converter class to use. Class constructor must not have any parameters.")
 				->end()
-			->scalarNode("value_converter")
-			->defaultValue(DefaultValueConverter::class)
-			->info("Value converter class or service to use.")
-			->end()
+				->scalarNode("value_converter")
+					->defaultValue(DefaultValueConverter::class)
+					->info("Value converter class or service to use.")
+				->end()
 				->arrayNode("repositories")
 					->useAttributeAsKey("namespace")
 					->requiresAtLeastOneElement()
@@ -80,6 +80,10 @@ class DataAccessKitBundle extends AbstractBundle
 							->end()
 						->end()
 					->end()
+				->end()
+				->booleanNode("repositories_public")
+					->defaultTrue()
+					->info("Make repository services public.")
 				->end()
 			->end();
 	}
@@ -157,7 +161,10 @@ class DataAccessKitBundle extends AbstractBundle
 				if ($result->hasMethod("__construct") && $result->method("__construct")->hasParameter(Compiler::PERSISTENCE_PROPERTY)) {
 					$cfg->arg('$' . Compiler::PERSISTENCE_PROPERTY, new Reference($this->persistenceId($result->repository->database)));
 				}
-				$services->alias($result->reflection->getName(), $result->getName());
+				$aliasCfg = $services->alias($result->reflection->getName(), $result->getName());
+				if ($config["repositories_public"]) {
+					$aliasCfg->public();
+				}
 			}
 		}
 	}
