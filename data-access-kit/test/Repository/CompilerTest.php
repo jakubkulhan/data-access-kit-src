@@ -26,6 +26,7 @@ use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindByArrayUsesInRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindIterableRepositoryInterface;
+use DataAccessKit\Repository\Fixture\GetForRepositoryInterface;
 use DataAccessKit\Repository\Fixture\GetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertBadParameterTypeRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertRepositoryInterface;
@@ -110,6 +111,7 @@ class CompilerTest extends TestCase
 			FindArrayRepositoryInterface::class,
 			FindByArrayUsesInRepositoryInterface::class,
 			GetRepositoryInterface::class,
+			GetForRepositoryInterface::class,
 			NullableGetRepositoryInterface::class,
 			CountRepositoryInterface::class,
 			PassClassAttributesRepositoryInterface::class,

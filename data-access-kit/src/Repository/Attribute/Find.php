@@ -15,6 +15,7 @@ class Find
 		public readonly ?string $orderBy = null,
 		public readonly ?string $limit = null,
 		public readonly ?string $offset = null,
+		public readonly ?string $for = null,
 	)
 	{
 	}

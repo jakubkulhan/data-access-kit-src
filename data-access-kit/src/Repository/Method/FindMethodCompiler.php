@@ -59,6 +59,9 @@ class FindMethodCompiler implements MethodCompilerInterface
 		if ($attribute->offset !== null) {
 			$sql .= " OFFSET {$attribute->offset}";
 		}
+		if ($attribute->for !== null) {
+			$sql .= " FOR {$attribute->for}";
+		}
 
 		$this->sqlMethodCompiler->compile($result, $method, new SQL($sql));
 	}
