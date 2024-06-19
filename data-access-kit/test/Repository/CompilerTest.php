@@ -24,6 +24,7 @@ use DataAccessKit\Repository\Fixture\FileDoesNotExistSQLFileRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindArrayRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadParameterNameRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindBadReturnTypeRepositoryInterface;
+use DataAccessKit\Repository\Fixture\FindByArrayUsesInRepositoryInterface;
 use DataAccessKit\Repository\Fixture\FindIterableRepositoryInterface;
 use DataAccessKit\Repository\Fixture\GetRepositoryInterface;
 use DataAccessKit\Repository\Fixture\InsertBadParameterTypeRepositoryInterface;
@@ -107,6 +108,7 @@ class CompilerTest extends TestCase
 			EmptyRepositoryInterface::class,
 			FindIterableRepositoryInterface::class,
 			FindArrayRepositoryInterface::class,
+			FindByArrayUsesInRepositoryInterface::class,
 			GetRepositoryInterface::class,
 			NullableGetRepositoryInterface::class,
 			CountRepositoryInterface::class,

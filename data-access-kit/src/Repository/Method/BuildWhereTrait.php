@@ -8,8 +8,11 @@ use DataAccessKit\Repository\Attribute\Find;
 use DataAccessKit\Repository\Exception\CompilerException;
 use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
+use ReflectionNamedType;
 use function implode;
+use function in_array;
 use function sprintf;
+use function str_ends_with;
 
 trait BuildWhereTrait
 {
@@ -18,8 +21,12 @@ trait BuildWhereTrait
 		$conditions = [];
 		foreach ($method->reflection->getParameters() as $parameter) {
 			$column = null;
+			$possibleNames = [$parameter->getName()];
+			if (str_ends_with($parameter->getName(), "s")) {
+				$possibleNames[] = substr($parameter->getName(), 0, -1);
+			}
 			foreach ($table->columns as $candidate) {
-				if ($candidate->reflection->getName() === $parameter->getName()) {
+				if (in_array($candidate->reflection->getName(), $possibleNames, true)) {
 					$column = $candidate;
 					break;
 				}
@@ -34,7 +41,11 @@ trait BuildWhereTrait
 				));
 			}
 
-			$conditions[] = "{$attribute->alias}.{$column->name} = @{$parameter->getName()}";
+			if ($parameter->getType() instanceof ReflectionNamedType && $parameter->getType()->getName() === "array") {
+				$conditions[] = "{$column->name} IN (@{$parameter->getName()})";
+			} else {
+				$conditions[] = "{$attribute->alias}.{$column->name} = @{$parameter->getName()}";
+			}
 		}
 
 		return implode(" AND ", $conditions);

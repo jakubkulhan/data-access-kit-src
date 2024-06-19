@@ -1,0 +1,36 @@
+<?php declare(strict_types=1);
+
+namespace DataAccessKit\Repository\Fixture;
+
+use DataAccessKit\Attribute\Column;
+use DataAccessKit\PersistenceInterface;
+
+final class FindByArrayUsesInRepository implements FindByArrayUsesInRepositoryInterface
+{
+	private object $findByIdsIdsArgumentItem;
+
+	public function __construct(
+		private readonly PersistenceInterface $persistence,
+	)
+	{
+		$this->findByIdsIdsArgumentItem = new class {
+			#[Column(name: "value")]
+			public int $value;
+		};
+	}
+
+	public function findByIds(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+}
