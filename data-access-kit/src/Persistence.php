@@ -6,6 +6,7 @@ use DataAccessKit\Attribute\Column;
 use DataAccessKit\Converter\ValueConverterInterface;
 use DataAccessKit\Exception\PersistenceException;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
 use Doctrine\DBAL\Platforms\MariaDBPlatform;
 use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
@@ -20,6 +21,9 @@ use function count;
 use function implode;
 use function in_array;
 use function is_array;
+use function is_bool;
+use function is_float;
+use function is_int;
 use function sprintf;
 
 class Persistence implements PersistenceInterface
@@ -160,6 +164,7 @@ class Persistence implements PersistenceInterface
 
 		$rows = "";
 		$values = [];
+		$types = [];
 		foreach ($objects as $index => $object) {
 			$row = "";
 
@@ -169,7 +174,8 @@ class Persistence implements PersistenceInterface
 						$row .= ", ";
 					}
 					$row .= "?";
-					$values[] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+					$values[] = $value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+					$types[] = $this->determineValueType($value);
 
 				} else {
 					throw new PersistenceException(sprintf(
@@ -209,7 +215,7 @@ class Persistence implements PersistenceInterface
 				default => "",
 			},
 		);
-		$result = $this->connection->executeQuery($sql, $values);
+		$result = $this->connection->executeQuery($sql, $values, $types);
 
 		if (count($returningColumns) > 0 && $supportsReturning) {
 			foreach ($result->iterateAssociative() as $index => $row) {
@@ -227,9 +233,11 @@ class Persistence implements PersistenceInterface
 
 		if (count($returningColumns) > 0 && count($returningColumns) > $primaryGeneratedCount && !$supportsReturning) {
 			$values = [];
+			$types = [];
 			foreach ($objects as $object) {
 				foreach ($primaryColumns as $column) {
-					$values[] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+					$values[] = $value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+					$types[] = $this->determineValueType($value);
 				}
 			}
 			$result = $this->connection->executeQuery(
@@ -241,6 +249,7 @@ class Persistence implements PersistenceInterface
 					implode(", ", array_fill(0, count($objects), "(" . implode(", ", array_fill(0, count($primaryColumns), "?")) . ")")),
 				),
 				$values,
+				$types,
 			);
 			foreach ($result->iterateAssociative() as $index => $row) {
 				$object = $objects[$index];
@@ -261,8 +270,10 @@ class Persistence implements PersistenceInterface
 
 		$set = [];
 		$setValues = [];
+		$setTypes = [];
 		$where = [];
 		$whereValues = [];
+		$whereTypes = [];
 		$returningColumns = [];
 
 		foreach ($table->columns as $column) {
@@ -272,13 +283,16 @@ class Persistence implements PersistenceInterface
 
 			if ($column->reflection->isInitialized($data)) {
 				$value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($data));
+				$type = $this->determineValueType($value);
 
 				if ($column->primary) {
 					$where[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
 					$whereValues[] = $value;
+					$whereTypes[] = $type;
 				} else if (!$column->generated && ($columns === null || in_array($column->name, $columns, true))) {
 					$set[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
 					$setValues[] = $value;
+					$setTypes[] = $type;
 				}
 
 			} else if ($column->primary) {
@@ -315,6 +329,7 @@ class Persistence implements PersistenceInterface
 				},
 			),
 			array_merge($setValues, $whereValues),
+			array_merge($setTypes, $whereTypes),
 		);
 		if (count($returningColumns) > 0) {
 			if (!$supportsReturning) {
@@ -326,6 +341,7 @@ class Persistence implements PersistenceInterface
 						implode(" AND ", $where),
 					),
 					$whereValues,
+					$whereTypes,
 				);
 			}
 			$row = $result->fetchAssociative();
@@ -353,6 +369,7 @@ class Persistence implements PersistenceInterface
 
 		$where = [];
 		$values = [];
+		$types = [];
 
 		$primaryColumns = [];
 		foreach ($table->columns as $column) {
@@ -369,7 +386,8 @@ class Persistence implements PersistenceInterface
 				}
 
 				$rowWhere[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
-				$values[] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+				$values[] = $value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
+				$types[] = $this->determineValueType($value);
 			}
 			$where[] = "(" . implode(" AND ", $rowWhere) . ")";
 		}
@@ -385,6 +403,7 @@ class Persistence implements PersistenceInterface
 				implode(" OR ", $where),
 			),
 			$values,
+			$types,
 		);
 	}
 
@@ -396,6 +415,15 @@ class Persistence implements PersistenceInterface
 			$row[$column->name] = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
 		}
 		return $row;
+	}
+
+	private function determineValueType(mixed $value): ParameterType
+	{
+		return match (true) {
+			is_bool($value) => ParameterType::BOOLEAN,
+			is_int($value) => ParameterType::INTEGER,
+			default => ParameterType::STRING,
+		};
 	}
 
 }

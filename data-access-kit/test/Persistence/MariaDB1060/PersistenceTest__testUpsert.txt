@@ -1,2 +1,2 @@
-INSERT INTO `users` (`user_id`, `first_name`, `last_name`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE `first_name` = VALUES(`first_name`), `last_name` = VALUES(`last_name`) RETURNING `user_id`, `full_name`;
+INSERT INTO `users` (`user_id`, `first_name`, `last_name`, `active`) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE `first_name` = VALUES(`first_name`), `last_name` = VALUES(`last_name`), `active` = VALUES(`active`) RETURNING `user_id`, `full_name`;
 SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = ?;

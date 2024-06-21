@@ -16,4 +16,6 @@ class User
 	public string $lastName;
 	#[Column(generated: true)]
 	public string $fullName;
+	#[Column]
+	public bool $active;
 }

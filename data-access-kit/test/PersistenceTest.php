@@ -80,21 +80,24 @@ class PersistenceTest extends TestCase
     			user_id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, 
     			first_name VARCHAR(255),
     			last_name VARCHAR(255),
-    			full_name VARCHAR(255) GENERATED ALWAYS AS (CONCAT(first_name, ' ', last_name)) STORED
+    			full_name VARCHAR(255) GENERATED ALWAYS AS (CONCAT(first_name, ' ', last_name)) STORED,
+    			active BOOLEAN DEFAULT TRUE
     		)");
 			} else if ($platform instanceof PostgreSQLPlatform) {
 				$this->connection->executeStatement("CREATE TABLE users (
     			user_id SERIAL PRIMARY KEY,
     			first_name VARCHAR(255),
     			last_name VARCHAR(255),
-    			full_name VARCHAR(255) GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED
+    			full_name VARCHAR(255) GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED,
+    			active BOOLEAN DEFAULT TRUE
     		)");
 			} else if ($platform instanceof SQLitePlatform) {
 				$this->connection->executeStatement("CREATE TABLE users (
     			user_id INTEGER PRIMARY KEY, 
     			first_name TEXT,
     			last_name TEXT,
-    			full_name TEXT GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED
+    			full_name TEXT GENERATED ALWAYS AS (first_name || ' ' || last_name) STORED,
+    			active BOOLEAN DEFAULT TRUE
     		)");
 			} else {
 				throw new LogicException(sprintf("Unsupported database platform [%s].", get_class($platform)));
@@ -150,7 +153,7 @@ class PersistenceTest extends TestCase
 
 	public function testSelectAllColumns(): void
 	{
-		$users = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users LIMIT 1"));
+		$users = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name, active FROM users LIMIT 1"));
 		$this->assertCount(1, $users);
 		$user = $users[0];
 		foreach ((new ReflectionClass($user))->getProperties() as $rp) {
@@ -185,6 +188,7 @@ class PersistenceTest extends TestCase
 		$user = new User();
 		$user->firstName = "Charlie";
 		$user->lastName = "Brown";
+		$user->active = true;
 		$this->persistence->insert($user);
 		$this->assertEquals(3, $user->id);
 
@@ -199,6 +203,27 @@ class PersistenceTest extends TestCase
 		$this->assertQueriesSnapshot();
 	}
 
+	public function testInsertBoolFalse(): void
+	{
+		$user = new User();
+		$user->firstName = "Charlie";
+		$user->lastName = "Brown";
+		$user->active = false;
+		$this->persistence->insert($user);
+		$this->assertEquals(3, $user->id);
+
+		$selectUsers = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = ?", [$user->id]));
+		$this->assertCount(1, $selectUsers);
+		$selectUser = $selectUsers[0];
+		$this->assertEquals($user->id, $selectUser->id);
+		$this->assertEquals($user->firstName, $selectUser->firstName);
+		$this->assertEquals($user->lastName, $selectUser->lastName);
+		$this->assertEquals($user->firstName . " " . $user->lastName, $selectUser->fullName);
+		$this->assertEquals(false, $user->active);
+
+		$this->assertQueriesSnapshot();
+	}
+
 	public function testInsertAll(): void
 	{
 		if ($this->connection->getDatabasePlatform() instanceof MySQLPlatform) {
@@ -208,10 +233,12 @@ class PersistenceTest extends TestCase
 		$user1 = new User();
 		$user1->firstName = "Charlie";
 		$user1->lastName = "Brown";
+		$user1->active = true;
 
 		$user2 = new User();
 		$user2->firstName = "David";
 		$user2->lastName = "White";
+		$user2->active = true;
 
 		$this->persistence->insert([$user1, $user2]);
 
@@ -246,6 +273,7 @@ class PersistenceTest extends TestCase
 		$user->id = 1;
 		$user->firstName = "Charlie";
 		$user->lastName = "Brown";
+		$user->active = true;
 
 		$this->persistence->upsert($user);
 		$this->assertEquals(1, $user->id);
@@ -264,11 +292,13 @@ class PersistenceTest extends TestCase
 		$user1->id = 1;
 		$user1->firstName = "Charlie";
 		$user1->lastName = "Brown";
+		$user1->active = true;
 
 		$user2 = new User();
 		$user2->id = 2;
 		$user2->firstName = "David";
 		$user2->lastName = "White";
+		$user2->active = true;
 
 		$users = [$user1, $user2];
 
@@ -294,6 +324,18 @@ class PersistenceTest extends TestCase
 		$user = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = 1"))[0];
 		$user->firstName = "Charlie";
 		$user->lastName = "Brown";
+		$this->persistence->update($user);
+		$this->assertEquals("Charlie Brown", $user->fullName);
+
+		$this->assertQueriesSnapshot();
+	}
+
+	public function testUpdateBoolFalse(): void
+	{
+		$user = iterator_to_array($this->persistence->select(User::class, "SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = 1"))[0];
+		$user->firstName = "Charlie";
+		$user->lastName = "Brown";
+		$user->active = false;
 		$this->persistence->update($user);
 		$this->assertEquals("Charlie Brown", $user->fullName);
 

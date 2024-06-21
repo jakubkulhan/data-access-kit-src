@@ -1,0 +1,3 @@
+SELECT user_id, first_name, last_name, full_name FROM users WHERE user_id = 1;
+UPDATE `users` SET `first_name` = ?, `last_name` = ?, `active` = ? WHERE `user_id` = ?;
+SELECT `full_name` FROM `users` WHERE `user_id` = ?;
