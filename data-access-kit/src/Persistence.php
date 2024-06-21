@@ -417,7 +417,7 @@ class Persistence implements PersistenceInterface
 		return $row;
 	}
 
-	private function determineValueType(mixed $value): ParameterType
+	private function determineValueType(mixed $value)
 	{
 		return match (true) {
 			is_bool($value) => ParameterType::BOOLEAN,
