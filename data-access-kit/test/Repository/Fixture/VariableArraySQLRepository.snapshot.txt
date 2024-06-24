@@ -18,6 +18,10 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 
 	private object $findByCreationTimeCreationTimesArgumentItem;
 
+	private object $findByTitleExcludeCreationTimeArguments;
+
+	private object $findByTitleExcludeCreationTimeExcludeCreatedAtArgumentItem;
+
 	private object $findByIdsUsedMultipleTimesIdsArgumentItem;
 
 	public function __construct(
@@ -41,6 +45,14 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 			public int $value;
 		};
 		$this->findByCreationTimeCreationTimesArgumentItem = new class {
+			#[Column(name: "value")]
+			public DateTimeImmutable $value;
+		};
+		$this->findByTitleExcludeCreationTimeArguments = new class {
+			#[Column(name: "title")]
+			public string $title;
+		};
+		$this->findByTitleExcludeCreationTimeExcludeCreatedAtArgumentItem = new class {
 			#[Column(name: "value")]
 			public DateTimeImmutable $value;
 		};
@@ -136,6 +148,26 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
 		}
 		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ') OR id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds, ...$argumentIds]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByTitleExcludeCreationTime(
+		string $title,
+		array $excludeCreatedAt,
+	): array
+	{
+		$arguments = clone $this->findByTitleExcludeCreationTimeArguments;
+		$arguments->title = $title;
+		$arguments = $this->persistence->toRow($arguments);
+
+		$argumentExcludeCreatedAt = [];
+		foreach ($excludeCreatedAt as $item) {
+			$itemObject = clone $this->findByTitleExcludeCreationTimeExcludeCreatedAtArgumentItem;
+			$itemObject->value = $item;
+			$argumentExcludeCreatedAt[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE title = ? AND COALESCE(createdAt NOT IN (' . (count($argumentExcludeCreatedAt) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentExcludeCreatedAt) - 1)) . '), TRUE)', [$arguments['title'], ...$argumentExcludeCreatedAt]);
 
 		return iterator_to_array($result);
 	}

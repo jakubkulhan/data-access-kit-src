@@ -40,6 +40,12 @@ interface VariableArraySQLRepositoryInterface
 	 */
 	public function findByCreationTime(array $creationTimes): array;
 
+	#[Find(where: "title = @title AND COALESCE(createdAt NOT IN (@excludeCreatedAt), TRUE)")]
+	/**
+	 * @param array<DateTimeImmutable> $excludeCreatedAt
+	 */
+	public function findByTitleExcludeCreationTime(string $title, array $excludeCreatedAt): array;
+
 	/**
 	 * @param int[] $ids
 	 */

@@ -129,6 +129,9 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		if (isset($argumentsProperties[$nonArrayArgumentsPropertyName])) {
 			$method->line("\$arguments = clone \$this->{$nonArrayArgumentsPropertyName};");
 			foreach ($method->reflection->getParameters() as $rp) {
+				if ($rp->getType() instanceof ReflectionNamedType && $rp->getType()->getName() === "array") {
+					continue;
+				}
 				$method->line("\$arguments->{$rp->getName()} = \$" . $rp->getName() . ";");
 			}
 			$method->line("\$arguments = \$this->persistence->toRow(\$arguments);");
