@@ -39,4 +39,10 @@ interface VariableArraySQLRepositoryInterface
 	 * @param array<DateTimeImmutable> $creationTimes
 	 */
 	public function findByCreationTime(array $creationTimes): array;
+
+	/**
+	 * @param int[] $ids
+	 */
+	#[SQL("SELECT * FROM foo WHERE id IN (@ids) OR id IN (@ids)")]
+	public function findByIdsUsedMultipleTimes(array $ids): array;
 }

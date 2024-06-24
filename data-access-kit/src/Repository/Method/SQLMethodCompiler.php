@@ -213,6 +213,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 		$sqlParameterExpressions = [];
 		$usedVariables = [];
+		$processedArgumentVariables = [];
 		$sql = preg_replace_callback(
 			'/
 				@(?P<variable>[a-zA-Z0-9_]+)
@@ -226,7 +227,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
 			/xi',
-			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables) {
+			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables, &$processedArgumentVariables) {
 				if (!empty($m["variable"])) {
 					$name = $m["variable"];
 					if (!isset($reflectionParametersByName[$name])) {
@@ -243,15 +244,18 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 					if ($rp->getType() instanceof ReflectionNamedType && $rp->getType()->getName() === "array") {
 						$argumentVariableName = "argument" . ucfirst($rp->getName());
-						$method
-							->line("\${$argumentVariableName} = [];")
-							->line("foreach (\${$rp->getName()} as \$item) {")
-							->indent()
-							->line("\$itemObject = clone \$this->" . $method->reflection->getName() . ucfirst($rp->getName()) . "ArgumentItem;")
-							->line("\$itemObject->value = \$item;")
-							->line("\${$argumentVariableName}[] = \$this->persistence->toRow(\$itemObject)['value'];")
-							->dedent()
-							->line("}");
+						if (!isset($processedArgumentVariables[$argumentVariableName])) {
+							$method
+								->line("\${$argumentVariableName} = [];")
+								->line("foreach (\${$rp->getName()} as \$item) {")
+								->indent()
+								->line("\$itemObject = clone \$this->" . $method->reflection->getName() . ucfirst($rp->getName()) . "ArgumentItem;")
+								->line("\$itemObject->value = \$item;")
+								->line("\${$argumentVariableName}[] = \$this->persistence->toRow(\$itemObject)['value'];")
+								->dedent()
+								->line("}");
+							$processedArgumentVariables[$argumentVariableName] = true;
+						}
 
 						$sqlParameterExpressions[] = "...\${$argumentVariableName}";
 						return static::DELIMITER . $argumentVariableName . static::DELIMITER;
