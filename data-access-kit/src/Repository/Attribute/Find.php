@@ -13,8 +13,8 @@ class Find
 		public readonly string $alias = "t",
 		public readonly ?string $where = null,
 		public readonly ?string $orderBy = null,
-		public readonly ?string $limit = null,
-		public readonly ?string $offset = null,
+		public readonly string|int|null $limit = null,
+		public readonly string|int|null $offset = null,
 		public readonly ?string $for = null,
 	)
 	{
