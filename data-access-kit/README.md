@@ -192,6 +192,7 @@ public function find(int $id): User;
 - `orderBy` - the ORDER BY clause. [Macros and variables](#macros-and-variables) available.
 - `limit` - the LIMIT clause.
 - `offset` - the OFFSET clause.
+- `for` - locking reads, see [e.g. MySQL's documentation](https://dev.mysql.com/doc/refman/8.4/en/innodb-locking-reads.html)
 
 ### Count
 
