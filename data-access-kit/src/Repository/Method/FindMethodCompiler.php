@@ -49,7 +49,10 @@ class FindMethodCompiler implements MethodCompilerInterface
 		$from = $attribute->from ?? $table->name;
 		$where = $attribute->where ?? $this->buildWhere($method, $table, $result, $attribute);
 
-		$sql = "SELECT {$select} FROM {$from} {$attribute->alias} WHERE {$where}";
+		$sql = "SELECT {$select} FROM {$from} {$attribute->alias}";
+		if ($where !== null && $where !== "") {
+			$sql .= " WHERE {$where}";
+		}
 		if ($attribute->orderBy !== null) {
 			$sql .= " ORDER BY {$attribute->orderBy}";
 		}
