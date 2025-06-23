@@ -145,25 +145,13 @@ class DefaultValueConverter implements ValueConverterInterface
 					}
 					$returnValue = $array;
 				}
-			} else if ($valueType->getName() === DateTime::class) {
-				$returnValue = DateTime::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
+			} else if (in_array($valueType->getName(), [DateTime::class, DateTimeImmutable::class], true)) {
+				/** @var class-string<DateTime|DateTimeImmutable> $className */
+				$className = $valueType->getName();
+				$returnValue = $className::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
 				if ($returnValue === false) {
 					try {
-						$returnValue = new DateTime($value, $this->dateTimeZone);
-					} catch (\Exception $e) {
-						throw new ConverterException(sprintf(
-							"Could not parse datetime value [%s] for property [%s::\$%s].",
-							$value,
-							$table->reflection->getName(),
-							$column->reflection->getName()
-						));
-					}
-				}
-			} else if ($valueType->getName() === DateTimeImmutable::class) {
-				$returnValue = DateTimeImmutable::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
-				if ($returnValue === false) {
-					try {
-						$returnValue = new DateTimeImmutable($value, $this->dateTimeZone);
+						$returnValue = new $className($value, $this->dateTimeZone);
 					} catch (\Exception $e) {
 						throw new ConverterException(sprintf(
 							"Could not parse datetime value [%s] for property [%s::\$%s].",
