@@ -147,8 +147,32 @@ class DefaultValueConverter implements ValueConverterInterface
 				}
 			} else if ($valueType->getName() === DateTime::class) {
 				$returnValue = DateTime::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
+				if ($returnValue === false) {
+					try {
+						$returnValue = new DateTime($value, $this->dateTimeZone);
+					} catch (\Exception $e) {
+						throw new ConverterException(sprintf(
+							"Could not parse datetime value [%s] for property [%s::\$%s].",
+							$value,
+							$table->reflection->getName(),
+							$column->reflection->getName()
+						));
+					}
+				}
 			} else if ($valueType->getName() === DateTimeImmutable::class) {
 				$returnValue = DateTimeImmutable::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
+				if ($returnValue === false) {
+					try {
+						$returnValue = new DateTimeImmutable($value, $this->dateTimeZone);
+					} catch (\Exception $e) {
+						throw new ConverterException(sprintf(
+							"Could not parse datetime value [%s] for property [%s::\$%s].",
+							$value,
+							$table->reflection->getName(),
+							$column->reflection->getName()
+						));
+					}
+				}
 			} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
 				$jsonObject = $decode ? json_decode($value) : $value;
 				$nestedObject = $nestedTable->reflection->newInstanceWithoutConstructor();
