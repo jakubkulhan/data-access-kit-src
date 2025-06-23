@@ -30,12 +30,13 @@ jobs:
         with:
           compose-file: docker-compose.yaml
           services: ${{ matrix.database.service }}
-      - uses: stringbean/docker-healthcheck-action@v1
-        with:
-          container: data-access-kit-src_${{ matrix.database.service }}_1
-          wait-time: 30
-          require-status: running
-          require-healthy: true
+      - name: Wait for container health
+        run: |
+          timeout 30s bash -c 'until docker inspect --format="{{.State.Health.Status}}" data-access-kit-src-${{ matrix.database.service }}-1 | grep -q "healthy"; do
+            echo "Waiting for container to be healthy..."
+            sleep 2
+          done'
+        if: matrix.database.service != 'sqlite'
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
