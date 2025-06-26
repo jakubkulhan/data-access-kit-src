@@ -36,4 +36,14 @@ class Table
 		$this->columns = $columns;
 	}
 
+	public function getName(): string
+	{
+		if ($this->name === null) {
+			throw new \LogicException(sprintf(
+				"Table name is not set. Make sure the table is properly registered in the Registry."
+			));
+		}
+		return $this->name;
+	}
+
 }

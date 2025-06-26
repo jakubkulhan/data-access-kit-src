@@ -2,6 +2,7 @@
 
 namespace DataAccessKit;
 
+use Composer\Pcre\Preg;
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
 use DataAccessKit\Converter\NameConverterInterface;
@@ -10,7 +11,6 @@ use LogicException;
 use ReflectionClass;
 use ReflectionNamedType;
 use function in_array;
-use function preg_match;
 use function sprintf;
 use function str_contains;
 use function strtolower;
@@ -81,7 +81,7 @@ class Registry
 				$rp->getType()->getName() === "array" &&
 				str_contains($rp->getDocComment() ?: "", "@var")
 			) {
-				if (preg_match(
+				if (Preg::match(
 					'/@var\s+\??(?:
 						(?:array|list)<\s*(?:[^,>]+,\s*)?(?P<arrayValueType>[^,>]+)>
 						|

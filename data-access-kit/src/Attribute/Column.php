@@ -24,4 +24,14 @@ class Column
 		$this->reflection = $reflection;
 	}
 
+	public function getName(): string
+	{
+		if ($this->name === null) {
+			throw new \LogicException(sprintf(
+				"Column name is not set. Make sure the column is properly registered in the Registry."
+			));
+		}
+		return $this->name;
+	}
+
 }

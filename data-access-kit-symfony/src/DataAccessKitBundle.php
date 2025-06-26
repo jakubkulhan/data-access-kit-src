@@ -166,7 +166,7 @@ class DataAccessKitBundle extends AbstractBundle
 				$className = rtrim($namespace, "\\") . "\\" . strtr(substr($file->getRelativePathname(), 0, -4 /* strlen(".php") */), DIRECTORY_SEPARATOR, "\\");
 				/** @var class-string $className */
 				[$result, $fileName] = $this->compileRepository($className, $compiler, $builder, $outputDir, $debug);
-				if ($result === null) {
+				if ($result === null || $fileName === null) {
 					continue;
 				}
 

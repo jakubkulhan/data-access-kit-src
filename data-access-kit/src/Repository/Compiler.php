@@ -2,6 +2,7 @@
 
 namespace DataAccessKit\Repository;
 
+use Composer\Pcre\Preg;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\Count;
 use DataAccessKit\Repository\Attribute\Delegate;
@@ -35,8 +36,7 @@ use function implode;
 use function in_array;
 use function is_array;
 use function is_string;
-use function preg_match;
-use function preg_replace;
+
 use function sprintf;
 use function strlen;
 use function strtolower;
@@ -107,9 +107,9 @@ class Compiler
 		}
 		/** @var Repository $repository */
 
-		if (preg_match('/Interface$/', $repositoryInterface->getShortName())) {
+		if (Preg::isMatch('/Interface$/', $repositoryInterface->getShortName())) {
 			$classShortName = substr($repositoryInterface->getShortName(), 0, -strlen("Interface"));
-		} else if (preg_match('/^I[A-Z]/', $repositoryInterface->getShortName())) {
+		} else if (Preg::isMatch('/^I[A-Z]/', $repositoryInterface->getShortName())) {
 			$classShortName = substr($repositoryInterface->getShortName(), 1);
 		} else {
 			$classShortName = $repositoryInterface->getShortName() . "Impl";
@@ -157,7 +157,7 @@ class Compiler
 			}
 
 			if ($methodCompiler === null) {
-				$words = explode(" ", strtolower(preg_replace('/(?<!^|[A-Z])[A-Z]/', ' $0', $rm->getName())));
+				$words = explode(" ", strtolower(Preg::replace('/(?<!^|[A-Z])[A-Z]/', ' $0', $rm->getName())));
 				if (in_array($words[0], ["get", "find"], true)) {
 					$methodCompiler = $this->methodCompilers[Find::class];
 					$methodCompilerAttribute = new Find();

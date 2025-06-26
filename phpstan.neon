@@ -1,5 +1,5 @@
 parameters:
-    level: 7
+    level: 8
     paths:
         - data-access-kit/src
         - data-access-kit-symfony/src

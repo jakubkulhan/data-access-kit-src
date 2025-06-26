@@ -2,6 +2,7 @@
 
 namespace DataAccessKit\Repository\Method;
 
+use Composer\Pcre\Preg;
 use DataAccessKit\Repository\Attribute\SQL;
 use DataAccessKit\Repository\Attribute\SQLFile;
 use DataAccessKit\Repository\Exception\CompilerException;
@@ -10,7 +11,6 @@ use DataAccessKit\Repository\Result;
 use DataAccessKit\Repository\ResultMethod;
 use function dirname;
 use function file_get_contents;
-use function preg_match;
 use function preg_quote;
 use function rtrim;
 use function sprintf;
@@ -38,7 +38,7 @@ class SQLFileMethodCompiler implements MethodCompilerInterface
 			));
 
 		}
-		if (!preg_match('~^(\w+://)?(\w:)?' . preg_quote(DIRECTORY_SEPARATOR, '~') . '~', $file)) {
+		if (!Preg::isMatch('~^(\w+://)?(\w:)?' . preg_quote(DIRECTORY_SEPARATOR, '~') . '~', $file)) {
 			$fileName = $result->reflection->getFileName();
 			if ($fileName === false) {
 				throw new CompilerException(sprintf(

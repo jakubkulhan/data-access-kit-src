@@ -2,9 +2,9 @@
 
 namespace DataAccessKit\Converter;
 
+use Composer\Pcre\Preg;
 use ReflectionClass;
 use ReflectionProperty;
-use function preg_replace;
 use function strtolower;
 
 class DefaultNameConverter implements NameConverterInterface
@@ -41,8 +41,8 @@ class DefaultNameConverter implements NameConverterInterface
 
 	public static function underscore(string $s): string
 	{
-		$s = preg_replace('/(?<!^|[A-Z])[A-Z]/', '_$0', $s);
-		$s = preg_replace('/^([A-Z]+)([A-Z])([a-z])/', '$1_$2$3', $s);
+		$s = Preg::replace('/(?<!^|[A-Z])[A-Z]/', '_$0', $s);
+		$s = Preg::replace('/^([A-Z]+)([A-Z])([a-z])/', '$1_$2$3', $s);
 		return strtolower($s);
 	}
 

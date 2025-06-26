@@ -217,24 +217,24 @@ class Persistence implements PersistenceInterface
 
 		$sql = sprintf(
 			"INSERT INTO %s (%s) VALUES %s%s%s",
-			$platform->quoteSingleIdentifier($table->name),
-			implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $insertColumns)),
+			$platform->quoteSingleIdentifier($table->getName()),
+			implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $insertColumns)),
 			$rows,
 			match (true) {
 				count($updateColumns) > 0 && $platform instanceof AbstractMySQLPlatform => sprintf(
 					" ON DUPLICATE KEY UPDATE %s",
-					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name) . " = VALUES(" . $platform->quoteSingleIdentifier($it->name) . ")", $updateColumns)),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()) . " = VALUES(" . $platform->quoteSingleIdentifier($it->getName()) . ")", $updateColumns)),
 				),
 				count($updateColumns) > 0 && ($platform instanceof PostgreSQLPlatform || $platform instanceof SQLitePlatform) => sprintf(
 					" ON CONFLICT (%s) DO UPDATE SET %s",
-					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $primaryColumns)),
-					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name) . " = EXCLUDED." . $platform->quoteSingleIdentifier($it->name), $updateColumns)),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $primaryColumns)),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()) . " = EXCLUDED." . $platform->quoteSingleIdentifier($it->getName()), $updateColumns)),
 				),
 				count($updateColumns) > 0 => throw new LogicException("Unreachable statement."),
 				default => "",
 			},
 			match (count($returningColumns) > 0 && $supportsReturning) {
-				true => sprintf(" RETURNING %s", implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns))),
+				true => sprintf(" RETURNING %s", implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $returningColumns))),
 				default => "",
 			},
 		);
@@ -266,9 +266,9 @@ class Persistence implements PersistenceInterface
 			$result = $this->connection->executeQuery(
 				sprintf(
 					"SELECT %s FROM %s WHERE (%s) IN (%s)",
-					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
-					$platform->quoteSingleIdentifier($table->name),
-					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $primaryColumns)),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $returningColumns)),
+					$platform->quoteSingleIdentifier($table->getName()),
+					implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $primaryColumns)),
 					implode(", ", array_fill(0, count($objects), "(" . implode(", ", array_fill(0, count($primaryColumns), "?")) . ")")),
 				),
 				$values,
@@ -309,11 +309,11 @@ class Persistence implements PersistenceInterface
 				$type = $this->determineValueType($value);
 
 				if ($column->primary) {
-					$where[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
+					$where[] = $platform->quoteSingleIdentifier($column->getName()) . " = ?";
 					$whereValues[] = $value;
 					$whereTypes[] = $type;
 				} else if (!$column->generated && ($columns === null || in_array($column->name, $columns, true))) {
-					$set[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
+					$set[] = $platform->quoteSingleIdentifier($column->getName()) . " = ?";
 					$setValues[] = $value;
 					$setTypes[] = $type;
 				}
@@ -340,13 +340,13 @@ class Persistence implements PersistenceInterface
 		$result = $this->connection->executeQuery(
 			sprintf(
 				"UPDATE %s SET %s WHERE %s%s",
-				$platform->quoteSingleIdentifier($table->name),
+				$platform->quoteSingleIdentifier($table->getName()),
 				implode(", ", $set),
 				implode(" AND ", $where),
 				match (true) {
 					count($returningColumns) > 0 && $supportsReturning => sprintf(
 						" RETURNING %s",
-						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
+						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $returningColumns)),
 					),
 					default => "",
 				},
@@ -359,8 +359,8 @@ class Persistence implements PersistenceInterface
 				$result = $this->connection->executeQuery(
 					sprintf(
 						"SELECT %s FROM %s WHERE %s",
-						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->name), $returningColumns)),
-						$platform->quoteSingleIdentifier($table->name),
+						implode(", ", array_map(fn(Column $it) => $platform->quoteSingleIdentifier($it->getName()), $returningColumns)),
+						$platform->quoteSingleIdentifier($table->getName()),
 						implode(" AND ", $where),
 					),
 					$whereValues,
@@ -411,7 +411,7 @@ class Persistence implements PersistenceInterface
 					throw new LogicException(sprintf("Primary column [%s] not initialized.", $column->name));
 				}
 
-				$rowWhere[] = $platform->quoteSingleIdentifier($column->name) . " = ?";
+				$rowWhere[] = $platform->quoteSingleIdentifier($column->getName()) . " = ?";
 				$values[] = $value = $this->valueConverter->objectToDatabase($table, $column, $column->reflection->getValue($object));
 				$types[] = $this->determineValueType($value);
 			}
@@ -425,7 +425,7 @@ class Persistence implements PersistenceInterface
 		$this->connection->executeStatement(
 			sprintf(
 				"DELETE FROM %s WHERE %s",
-				$platform->quoteSingleIdentifier($table->name),
+				$platform->quoteSingleIdentifier($table->getName()),
 				implode(" OR ", $where),
 			),
 			$values,

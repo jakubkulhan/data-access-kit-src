@@ -2,6 +2,7 @@
 
 namespace DataAccessKit\Repository\Method;
 
+use Composer\Pcre\Preg;
 use DataAccessKit\Attribute\Column;
 use DataAccessKit\Registry;
 use DataAccessKit\Repository\Attribute\SQL;
@@ -25,10 +26,7 @@ use function ctype_lower;
 use function explode;
 use function implode;
 use function in_array;
-use function preg_match;
 use function preg_quote;
-use function preg_replace_callback;
-use function preg_split;
 use function sprintf;
 use function strtolower;
 use function ucfirst;
@@ -68,7 +66,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		$argumentsProperties = [];
 		foreach ($method->reflection->getParameters() as $rp) {
 			if ($rp->getType() instanceof ReflectionNamedType && $rp->getType()->getName() === "array") {
-				if (!preg_match(
+				if (!Preg::match(
 					'/@param\s+(?:
 							(?:array|list)<\s*(?:[^,>]+,\s*)?(?P<arrayValueType>[^,>]+)>
 							|
@@ -227,7 +225,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		$sqlParameterExpressions = [];
 		$usedVariables = [];
 		$processedArgumentVariables = [];
-		$sql = preg_replace_callback(
+		$sql = Preg::replaceCallback(
 			'/
 				@(?P<variable>[a-zA-Z0-9_]+)
 				|
@@ -242,6 +240,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			/xi',
 			/**
 			 * @param array<string> $m
+			 * @return string
 			 */
 			static function (array $m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables, &$processedArgumentVariables): string {
 				if (!empty($m["variable"])) {
@@ -282,16 +281,13 @@ class SQLMethodCompiler implements MethodCompilerInterface
 					}
 
 				} else if (!empty($m["table"])) {
-					return $table->name;
+					return $table->getName();
 
 				} else if (!empty($m["columns"])) {
 					$columnNames = array_keys($table->columns);
 
 					if (!empty($m["columnsExcept"])) {
-						$exceptColumns = preg_split('/\s*,\s*/', $m["columnsExcept"]);
-						if ($exceptColumns === false) {
-							throw new CompilerException("Failed to parse columnsExcept specification.");
-						}
+						$exceptColumns = Preg::split('/\s*,\s*/', $m["columnsExcept"]);
 						foreach ($exceptColumns as $exceptColumnName) {
 							$key = array_search($exceptColumnName, $columnNames, true);
 							if ($key === false) {
