@@ -6,6 +6,9 @@ use DataAccessKit\Attribute\Column;
 use DataAccessKit\Attribute\Table;
 use DataAccessKit\Converter\Fixture\DeepNestedObject;
 use DataAccessKit\Converter\Fixture\NestedObject;
+use DataAccessKit\Converter\Fixture\StatusEnum;
+use DataAccessKit\Converter\Fixture\PriorityEnum;
+use DataAccessKit\Converter\Fixture\UnitEnum;
 use DataAccessKit\Registry;
 use DateTime;
 use DateTimeImmutable;
@@ -100,6 +103,15 @@ class DefaultValueConverterTest extends TestCase
 			#[Column] public DeepNestedObject $deepNestedObject;
 			#[Column] public ?DeepNestedObject $nullableDeepNestedObjectNull;
 			#[Column] public ?DeepNestedObject $nullableDeepNestedObjectNotNull;
+			#[Column] public StatusEnum $statusEnum;
+			#[Column] public ?StatusEnum $nullableStatusEnumNull;
+			#[Column] public ?StatusEnum $nullableStatusEnumNotNull;
+			#[Column] public PriorityEnum $priorityEnum;
+			#[Column] public ?PriorityEnum $nullablePriorityEnumNull;
+			#[Column] public ?PriorityEnum $nullablePriorityEnumNotNull;
+			#[Column] public UnitEnum $unitEnum;
+			#[Column] public ?UnitEnum $nullableUnitEnumNull;
+			#[Column] public ?UnitEnum $nullableUnitEnumNotNull;
 		});
 
 		$data = [
@@ -139,6 +151,15 @@ class DefaultValueConverterTest extends TestCase
 			"deepNestedObject" => [new DeepNestedObject(new DeepNestedObject()), '{"nested":{"nested":null}}'],
 			"nullableDeepNestedObjectNull" => [null, null],
 			"nullableDeepNestedObjectNotNull" => [new DeepNestedObject(new DeepNestedObject()), '{"nested":{"nested":null}}'],
+			"statusEnum" => [StatusEnum::Active, 'active'],
+			"nullableStatusEnumNull" => [null, null],
+			"nullableStatusEnumNotNull" => [StatusEnum::Pending, 'pending'],
+			"priorityEnum" => [PriorityEnum::High, 3],
+			"nullablePriorityEnumNull" => [null, null],
+			"nullablePriorityEnumNotNull" => [PriorityEnum::Medium, 2],
+			"unitEnum" => [UnitEnum::Red, 'Red'],
+			"nullableUnitEnumNull" => [null, null],
+			"nullableUnitEnumNotNull" => [UnitEnum::Blue, 'Blue'],
 		];
 		foreach ($data as $columnName => [$objectValue, $databaseValue]) {
 			yield $columnName => [$table, $table->columns[$columnName], $objectValue, $databaseValue];

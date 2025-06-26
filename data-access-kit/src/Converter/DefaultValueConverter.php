@@ -10,7 +10,11 @@ use DateTime;
 use DateTimeImmutable;
 use DateTimeZone;
 use ReflectionNamedType;
+use ReflectionEnum;
+use BackedEnum;
+use UnitEnum;
 use stdClass;
+use function enum_exists;
 use function in_array;
 use function is_object;
 use function json_decode;
@@ -74,6 +78,14 @@ class DefaultValueConverter implements ValueConverterInterface
 				} else if (in_array($valueType->getName(), [DateTime::class, DateTimeImmutable::class], true)) {
 					/** @var DateTime|DateTimeImmutable $value */
 					$returnValue = (clone $value)->setTimezone($this->dateTimeZone)->format($this->dateTimeFormat);
+				} else if (enum_exists($valueType->getName())) {
+					/** @var BackedEnum|UnitEnum $value */
+					if ($value instanceof BackedEnum) {
+						$returnValue = $value->value;
+					} else {
+						// Unit enum - store the name
+						$returnValue = $value->name;
+					}
 				} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
 					$jsonObject = new stdClass();
 					foreach ($nestedTable->columns as $nestedColumn) {
@@ -156,6 +168,35 @@ class DefaultValueConverter implements ValueConverterInterface
 						throw new ConverterException(sprintf(
 							"Could not parse datetime value [%s] for property [%s::\$%s].",
 							$value,
+							$table->reflection->getName(),
+							$column->reflection->getName()
+						));
+					}
+				}
+			} else if (enum_exists($valueType->getName())) {
+				/** @var class-string<BackedEnum|UnitEnum> $className */
+				$className = $valueType->getName();
+				$enumReflection = new ReflectionEnum($className);
+				
+				if ($enumReflection->isBacked()) {
+					// Backed enum - use from() method
+					/** @var class-string<BackedEnum> $className */
+					$returnValue = $className::from($value);
+				} else {
+					// Unit enum - find case by name
+					$cases = $enumReflection->getCases();
+					$returnValue = null;
+					foreach ($cases as $case) {
+						if ($case->getName() === $value) {
+							$returnValue = $case->getValue();
+							break;
+						}
+					}
+					if ($returnValue === null) {
+						throw new ConverterException(sprintf(
+							"Could not find enum case [%s] for enum [%s] in property [%s::\$%s].",
+							$value,
+							$className,
 							$table->reflection->getName(),
 							$column->reflection->getName()
 						));
