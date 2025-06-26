@@ -117,7 +117,9 @@ class Compiler
 
 		$result = new Result($repository, $repositoryInterface, $repositoryInterface->getNamespaceName(), $classShortName);
 		foreach ($classAttributes as $classAttribute) {
-			$result->attribute($result->use($classAttribute->getName()))->setArguments($classAttribute->getArguments());
+			/** @var class-string $attributeName */
+			$attributeName = $classAttribute->getName();
+			$result->attribute($result->use($attributeName))->setArguments($classAttribute->getArguments());
 		}
 
 		return $result;
@@ -192,7 +194,9 @@ class Compiler
 			$method = $result->method($rm->getName());
 			$method->setReflection($rm);
 			foreach ($methodAttributes as $ra) {
-				$method->attribute($result->use($ra->getName()))->setArguments($ra->getArguments());
+				/** @var class-string $attributeName */
+				$attributeName = $ra->getName();
+				$method->attribute($result->use($attributeName))->setArguments($ra->getArguments());
 			}
 			foreach ($rm->getParameters() as $rp) {
 				$parameter = $method->parameter($rp->getName());
@@ -219,7 +223,9 @@ class Compiler
 			if ($type->isBuiltin()) {
 				$s = $type->getName();
 			} else {
-				$s = $result->use($type->getName());
+				/** @var class-string $typeName */
+				$typeName = $type->getName();
+				$s = $result->use($typeName);
 			}
 			if ($type->getName() !== "null" && $type->allowsNull()) {
 				$s = "?" . $s;
@@ -232,8 +238,13 @@ class Compiler
 			}
 			return implode("|", $types);
 		} else {
-			// Must be ReflectionIntersectionType
-			assert($type instanceof ReflectionIntersectionType);
+			// Must be ReflectionIntersectionType (the only remaining possibility)
+			if (!$type instanceof ReflectionIntersectionType) {
+				throw new CompilerException(sprintf(
+					"Unexpected ReflectionType subclass: %s. Expected ReflectionIntersectionType.",
+					get_class($type)
+				));
+			}
 			$types = [];
 			foreach ($type->getTypes() as $t) {
 				$types[] = static::phpType($result, $t);

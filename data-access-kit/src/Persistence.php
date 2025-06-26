@@ -37,11 +37,18 @@ class Persistence implements PersistenceInterface
 	{
 	}
 
+	/**
+	 * @template T of object
+	 * @param class-string<T> $className
+	 * @return \Generator<int, T, mixed, void>
+	 */
 	public function select(string $className, string $sql, array $parameters = []): iterable
 	{
 		$table = $this->registry->get($className);
 
-		$result = $this->connection->executeQuery($sql, $parameters);
+		/** @var array<int<0, max>|string, mixed> $dbParams */
+		$dbParams = $parameters;
+		$result = $this->connection->executeQuery($sql, $dbParams);
 		foreach ($result->iterateAssociative() as $row) {
 			$object = $table->reflection->newInstanceWithoutConstructor();
 			foreach ($row as $columnName => $value) {
@@ -51,18 +58,30 @@ class Persistence implements PersistenceInterface
 					$this->valueConverter->databaseToObject($table, $column, $value),
 				);
 			}
+			/** @var T $object */
 			yield $object;
 		}
 	}
 
 	public function selectScalar(string $sql, array $parameters = []): mixed
 	{
-		return $this->connection->executeQuery($sql, $parameters)->fetchOne();
+		/** @var array<int<0, max>|string, mixed> $dbParams */
+		$dbParams = $parameters;
+		return $this->connection->executeQuery($sql, $dbParams)->fetchOne();
 	}
 
 	public function execute(string $sql, array $parameters = []): int
 	{
-		return $this->connection->executeStatement($sql, $parameters);
+		/** @var array<int<0, max>|string, mixed> $dbParams */
+		$dbParams = $parameters;
+		$result = $this->connection->executeStatement($sql, $dbParams);
+		if (!is_int($result)) {
+			throw new PersistenceException(sprintf(
+				"Expected executeStatement to return int, got %s. This should not happen with properly formed SQL statements.",
+				get_debug_type($result)
+			));
+		}
+		return $result;
 	}
 
 	public function insert(object|array $data): void
@@ -349,6 +368,9 @@ class Persistence implements PersistenceInterface
 				);
 			}
 			$row = $result->fetchAssociative();
+			if ($row === false) {
+				throw new PersistenceException("Failed to fetch updated row.");
+			}
 			foreach ($returningColumns as $column) {
 				$column->reflection->setValue(
 					$data,

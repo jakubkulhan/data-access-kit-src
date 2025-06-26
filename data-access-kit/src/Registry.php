@@ -41,6 +41,7 @@ class Registry
 			return $this->tablesByClassName[$className];
 		}
 
+		/** @var class-string $className */
 		$rc = new ReflectionClass($className);
 		if ($rc->isTrait() || $rc->isInterface() || $rc->isAbstract()) {
 			throw new LogicException(sprintf(
@@ -143,9 +144,10 @@ class Registry
 
 	private static function missingTableException(object|string $className): LogicException
 	{
+		$classNameStr = is_object($className) ? get_class($className) : $className;
 		return new LogicException(sprintf(
 			"Class %s is missing #[\\%s] attribute.",
-			$className,
+			$classNameStr,
 			Table::class,
 		));
 	}

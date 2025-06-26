@@ -40,7 +40,9 @@ class Result implements Stringable
 	)
 	{
 		$this->use($reflection->getName());
-		$this->dependsOn(new ReflectionClass($this->repository->class));
+		/** @var class-string $repositoryClass */
+		$repositoryClass = $this->repository->class;
+		$this->dependsOn(new ReflectionClass($repositoryClass));
 	}
 
 	public function getName(): string
@@ -52,6 +54,9 @@ class Result implements Stringable
 		return $this->namespaceName . "\\" . $this->shortName;
 	}
 
+	/**
+	 * @param class-string $class
+	 */
 	public function use(string $class): string
 	{
 		if (isset($this->useStatements[$class])) {

@@ -24,7 +24,9 @@ class DelegateMethodCompiler implements MethodCompilerInterface
 	public function compile(Result $result, ResultMethod $method, $attribute): void
 	{
 		try {
-			$delegateRC = new ReflectionClass($attribute->class);
+			/** @var class-string $delegateClass */
+			$delegateClass = $attribute->class;
+			$delegateRC = new ReflectionClass($delegateClass);
 		} catch (ReflectionException $e) {
 			throw new CompilerException(
 				sprintf(

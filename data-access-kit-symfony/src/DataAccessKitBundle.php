@@ -144,7 +144,9 @@ class DataAccessKitBundle extends AbstractBundle
 	 */
 	private function configureRepositoryServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
 	{
-		$nameConverter = new $config["name_converter"]();
+		/** @var class-string<NameConverterInterface> $nameConverterClass */
+		$nameConverterClass = $config["name_converter"];
+		$nameConverter = new $nameConverterClass();
 		$registry = new Registry($nameConverter);
 		$compiler = new Compiler($registry);
 		$outputDir = $builder->getParameterBag()->resolveValue("%kernel.cache_dir%") . DIRECTORY_SEPARATOR . "DataAccessKit";
@@ -162,6 +164,7 @@ class DataAccessKitBundle extends AbstractBundle
 
 			foreach ($finder as $file) {
 				$className = rtrim($namespace, "\\") . "\\" . strtr(substr($file->getRelativePathname(), 0, -4 /* strlen(".php") */), DIRECTORY_SEPARATOR, "\\");
+				/** @var class-string $className */
 				[$result, $fileName] = $this->compileRepository($className, $compiler, $builder, $outputDir, $debug);
 				if ($result === null) {
 					continue;
@@ -182,6 +185,7 @@ class DataAccessKitBundle extends AbstractBundle
 	}
 
 	/**
+	 * @param class-string $className
 	 * @return array{0: \DataAccessKit\Repository\Result|null, 1: string|null}
 	 */
 	private function compileRepository(string $className, Compiler $compiler, ContainerBuilder $builder, string $outputDir, bool $debug): array

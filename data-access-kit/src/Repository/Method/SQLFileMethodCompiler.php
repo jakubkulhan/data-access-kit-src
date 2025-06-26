@@ -39,7 +39,16 @@ class SQLFileMethodCompiler implements MethodCompilerInterface
 
 		}
 		if (!preg_match('~^(\w+://)?(\w:)?' . preg_quote(DIRECTORY_SEPARATOR, '~') . '~', $file)) {
-			$file = dirname($result->reflection->getFileName()) . DIRECTORY_SEPARATOR . $file;
+			$fileName = $result->reflection->getFileName();
+			if ($fileName === false) {
+				throw new CompilerException(sprintf(
+					"Cannot determine file path for SQL file [%s] in method [%s::%s] - reflection has no filename.",
+					$file,
+					$result->reflection->getName(),
+					$method->reflection->getName(),
+				));
+			}
+			$file = dirname($fileName) . DIRECTORY_SEPARATOR . $file;
 		}
 
 		$contents = @file_get_contents($file);

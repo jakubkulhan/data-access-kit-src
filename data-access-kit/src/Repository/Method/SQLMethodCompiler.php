@@ -94,9 +94,13 @@ class SQLMethodCompiler implements MethodCompilerInterface
 
 				$useStatements = $this->phpParser->parseUseStatements($result->reflection);
 				if (isset($useStatements[strtolower($phpType)])) {
-					$phpType = $result->use($useStatements[strtolower($phpType)]);
+					/** @var class-string $resolvedType */
+					$resolvedType = $useStatements[strtolower($phpType)];
+					$phpType = $result->use($resolvedType);
 				} else if (!ctype_lower($phpType[0])) {
-					$phpType = $result->use($phpType);
+					/** @var class-string $phpTypeClass */
+					$phpTypeClass = $phpType;
+					$phpType = $result->use($phpTypeClass);
 				}
 
 				$propertyName = $method->reflection->getName() . ucfirst($rp->getName()) . "ArgumentItem";
@@ -111,7 +115,9 @@ class SQLMethodCompiler implements MethodCompilerInterface
 			if (!isset($argumentsProperties[$propertyName])) {
 				$argumentsProperties[$propertyName] = [];
 			}
-			$argumentsProperties[$propertyName][] = "#[{$result->use(Column::class)}(name: \"{$name}\")]";
+			/** @var class-string $columnClass */
+			$columnClass = Column::class;
+			$argumentsProperties[$propertyName][] = "#[{$result->use($columnClass)}(name: \"{$name}\")]";
 			$argumentsProperties[$propertyName][] = "public {$phpType} \${$name};";
 		}
 
@@ -174,6 +180,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				$itemType = $returnType->getName();
 			}
 			if ($aliasUse) {
+				/** @var class-string $itemType */
 				$itemAlias = $result->use($itemType);
 			} else {
 				$itemAlias = $itemType;
@@ -233,7 +240,10 @@ class SQLMethodCompiler implements MethodCompilerInterface
 				|
 				%(?P<macro>[a-zA-Z0-9_]+\b(?:\([^)]*\))?)
 			/xi',
-			static function ($m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables, &$processedArgumentVariables) {
+			/**
+			 * @param array<string> $m
+			 */
+			static function (array $m) use ($result, $method, $table, $reflectionParametersByName, &$sqlParameterExpressions, &$usedVariables, &$processedArgumentVariables): string {
 				if (!empty($m["variable"])) {
 					$name = $m["variable"];
 					if (!isset($reflectionParametersByName[$name])) {
@@ -278,7 +288,11 @@ class SQLMethodCompiler implements MethodCompilerInterface
 					$columnNames = array_keys($table->columns);
 
 					if (!empty($m["columnsExcept"])) {
-						foreach (preg_split('/\s*,\s*/', $m["columnsExcept"]) as $exceptColumnName) {
+						$exceptColumns = preg_split('/\s*,\s*/', $m["columnsExcept"]);
+						if ($exceptColumns === false) {
+							throw new CompilerException("Failed to parse columnsExcept specification.");
+						}
+						foreach ($exceptColumns as $exceptColumnName) {
 							$key = array_search($exceptColumnName, $columnNames, true);
 							if ($key === false) {
 								throw new CompilerException(sprintf(
