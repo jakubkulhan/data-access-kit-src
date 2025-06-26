@@ -46,7 +46,7 @@ class Compiler
 {
 	public const string PERSISTENCE_PROPERTY = "persistence";
 
-	/** @var array<string, MethodCompilerInterface> */
+	/** @var array<string, MethodCompilerInterface<mixed>> */
 	private array $methodCompilers = [];
 
 	public function __construct(
@@ -66,6 +66,7 @@ class Compiler
 
 	/**
 	 * @param class-string $attributeClassName
+	 * @param MethodCompilerInterface<mixed> $methodCompiler
 	 */
 	public function registerMethodCompiler(string $attributeClassName, MethodCompilerInterface $methodCompiler): void
 	{
@@ -73,9 +74,9 @@ class Compiler
 	}
 
 	/**
-	 * @param class-string|ReflectionClass $repositoryInterface
+	 * @param class-string|\ReflectionClass<object> $repositoryInterface
 	 */
-	public function prepare(ReflectionClass|string $repositoryInterface): Result
+	public function prepare(\ReflectionClass|string $repositoryInterface): Result
 	{
 		if (is_string($repositoryInterface)) {
 			$repositoryInterface = new ReflectionClass($repositoryInterface);
@@ -89,7 +90,7 @@ class Compiler
 		}
 
 		$repository = null;
-		/** @var ReflectionAttribute[] $classAttributes */
+		/** @var \ReflectionAttribute<object>[] $classAttributes */
 		$classAttributes = [];
 		foreach ($repositoryInterface->getAttributes() as $ra) {
 			if ($ra->getName() === Repository::class) {
@@ -129,12 +130,12 @@ class Compiler
 		foreach ($result->reflection->getMethods() as $index => $rm) {
 			$result->dependsOn($rm->getDeclaringClass());
 
-			$methodIndices[$index] = $rm->getName();
+			$methodIndices[$rm->getName()] = $index;
 
-			/** @var MethodCompilerInterface|null $methodCompiler */
+			/** @var MethodCompilerInterface<mixed>|null $methodCompiler */
 			$methodCompiler = null;
 			$methodCompilerAttribute = null;
-			/** @var ReflectionAttribute[] $methodAttributes */
+			/** @var \ReflectionAttribute<object>[] $methodAttributes */
 			$methodAttributes = [];
 
 			foreach ($rm->getAttributes() as $ra) {
@@ -210,7 +211,7 @@ class Compiler
 		return $result;
 	}
 
-	public static function phpType(Result $result, ReflectionUnionType|ReflectionIntersectionType|ReflectionNamedType|null $type): string
+	public static function phpType(Result $result, \ReflectionType|null $type): string
 	{
 		if ($type === null) {
 			return "";
@@ -230,14 +231,14 @@ class Compiler
 				$types[] = static::phpType($result, $t);
 			}
 			return implode("|", $types);
-		} else if ($type instanceof ReflectionIntersectionType) {
+		} else {
+			// Must be ReflectionIntersectionType
+			assert($type instanceof ReflectionIntersectionType);
 			$types = [];
 			foreach ($type->getTypes() as $t) {
 				$types[] = static::phpType($result, $t);
 			}
 			return implode("&", $types);
-		} else {
-			throw new LogicException("Unreachable statement.");
 		}
 	}
 

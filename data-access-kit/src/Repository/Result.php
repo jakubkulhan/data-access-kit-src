@@ -26,9 +26,12 @@ class Result implements Stringable
 	private array $methods = [];
 	/** @var array<string, ResultAttribute> */
 	private array $attributes = [];
-	/** @var array<string, ReflectionClass> */
+	/** @var array<string, ReflectionClass<object>> */
 	public array $dependencies = [];
 
+	/**
+	 * @param ReflectionClass<object> $reflection
+	 */
 	public function __construct(
 		public readonly Repository $repository,
 		public readonly ReflectionClass $reflection,
@@ -69,6 +72,9 @@ class Result implements Stringable
 		return $this->useStatements[$class] = $alias;
 	}
 
+	/**
+	 * @param ReflectionClass<object> $rc
+	 */
 	public function dependsOn(ReflectionClass $rc): void
 	{
 		$this->dependencies[$rc->getName()] = $rc;
@@ -94,6 +100,9 @@ class Result implements Stringable
 		return isset($this->methods[$name]);
 	}
 
+	/**
+	 * @param array<string, int> $methodIndices
+	 */
 	public function sortMethod(array $methodIndices): void
 	{
 		uasort($this->methods, function (ResultMethod $a, ResultMethod $b) use ($methodIndices) {

@@ -88,6 +88,9 @@ class DataAccessKitBundle extends AbstractBundle
 			->end();
 	}
 
+	/**
+	 * @param array<string, mixed> $config
+	 */
 	public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
 	{
 		$services = $container->services();
@@ -104,6 +107,9 @@ class DataAccessKitBundle extends AbstractBundle
 		return "data_access_kit.{$name}_persistence";
 	}
 
+	/**
+	 * @param array<string, mixed> $config
+	 */
 	private function configureGlobalServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
 	{
 		$services->set($config["name_converter"])->autowire();
@@ -117,6 +123,9 @@ class DataAccessKitBundle extends AbstractBundle
 		$services->alias(ValueConverterInterface::class, $config["value_converter"]);
 	}
 
+	/**
+	 * @param array<string, mixed> $config
+	 */
 	private function configureDatabaseServices(array $config, ServicesConfigurator $services): void
 	{
 		foreach ($config["databases"] as $name => $database) {
@@ -130,6 +139,9 @@ class DataAccessKitBundle extends AbstractBundle
 		}
 	}
 
+	/**
+	 * @param array<string, mixed> $config
+	 */
 	private function configureRepositoryServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
 	{
 		$nameConverter = new $config["name_converter"]();
@@ -169,6 +181,9 @@ class DataAccessKitBundle extends AbstractBundle
 		}
 	}
 
+	/**
+	 * @return array{0: \DataAccessKit\Repository\Result|null, 1: string|null}
+	 */
 	private function compileRepository(string $className, Compiler $compiler, ContainerBuilder $builder, string $outputDir, bool $debug): array
 	{
 		try {

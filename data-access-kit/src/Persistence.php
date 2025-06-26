@@ -85,6 +85,10 @@ class Persistence implements PersistenceInterface
 		$this->doInsert($data, $columns);
 	}
 
+	/**
+	 * @param array<object> $objects
+	 * @param array<string>|null $upsertColumns
+	 */
 	private function doInsert(array $objects, ?array $upsertColumns = null): void
 	{
 		if (count($objects) === 0) {
@@ -417,7 +421,7 @@ class Persistence implements PersistenceInterface
 		return $row;
 	}
 
-	private function determineValueType(mixed $value)
+	private function determineValueType(mixed $value): ParameterType
 	{
 		return match (true) {
 			is_bool($value) => ParameterType::BOOLEAN,

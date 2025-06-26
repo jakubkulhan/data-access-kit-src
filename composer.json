@@ -41,6 +41,6 @@
             "@test:database:postgres",
             "@test:database:sqlite"
         ],
-        "test:phpstan": "./vendor/bin/phpstan analyse data-access-kit/src data-access-kit-symfony/src --memory-limit=512M"
+        "test:phpstan": "./vendor/bin/phpstan analyse --memory-limit=512M"
     }
 }

@@ -62,17 +62,17 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 		};
 	}
 
-	public function findByCreationTime(
-		array $creationTimes,
+	public function findByIdsPostfix(
+		array $ids,
 	): array
 	{
-		$argumentCreationTimes = [];
-		foreach ($creationTimes as $item) {
-			$itemObject = clone $this->findByCreationTimeCreationTimesArgumentItem;
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsPostfixIdsArgumentItem;
 			$itemObject->value = $item;
-			$argumentCreationTimes[] = $this->persistence->toRow($itemObject)['value'];
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
 		}
-		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE createdAt IN (' . (count($argumentCreationTimes) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentCreationTimes) - 1)) . ')', [...$argumentCreationTimes]);
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
 
 		return iterator_to_array($result);
 	}
@@ -122,32 +122,17 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 		return iterator_to_array($result);
 	}
 
-	public function findByIdsPostfix(
-		array $ids,
+	public function findByCreationTime(
+		array $creationTimes,
 	): array
 	{
-		$argumentIds = [];
-		foreach ($ids as $item) {
-			$itemObject = clone $this->findByIdsPostfixIdsArgumentItem;
+		$argumentCreationTimes = [];
+		foreach ($creationTimes as $item) {
+			$itemObject = clone $this->findByCreationTimeCreationTimesArgumentItem;
 			$itemObject->value = $item;
-			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+			$argumentCreationTimes[] = $this->persistence->toRow($itemObject)['value'];
 		}
-		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds]);
-
-		return iterator_to_array($result);
-	}
-
-	public function findByIdsUsedMultipleTimes(
-		array $ids,
-	): array
-	{
-		$argumentIds = [];
-		foreach ($ids as $item) {
-			$itemObject = clone $this->findByIdsUsedMultipleTimesIdsArgumentItem;
-			$itemObject->value = $item;
-			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
-		}
-		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ') OR id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds, ...$argumentIds]);
+		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE createdAt IN (' . (count($argumentCreationTimes) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentCreationTimes) - 1)) . ')', [...$argumentCreationTimes]);
 
 		return iterator_to_array($result);
 	}
@@ -168,6 +153,21 @@ final class VariableArraySQLRepository implements VariableArraySQLRepositoryInte
 			$argumentExcludeCreatedAt[] = $this->persistence->toRow($itemObject)['value'];
 		}
 		$result = $this->persistence->select(Foo::class, 'SELECT t.id, t.title, t.description, t.created_at FROM foos t WHERE title = ? AND COALESCE(createdAt NOT IN (' . (count($argumentExcludeCreatedAt) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentExcludeCreatedAt) - 1)) . '), TRUE)', [$arguments['title'], ...$argumentExcludeCreatedAt]);
+
+		return iterator_to_array($result);
+	}
+
+	public function findByIdsUsedMultipleTimes(
+		array $ids,
+	): array
+	{
+		$argumentIds = [];
+		foreach ($ids as $item) {
+			$itemObject = clone $this->findByIdsUsedMultipleTimesIdsArgumentItem;
+			$itemObject->value = $item;
+			$argumentIds[] = $this->persistence->toRow($itemObject)['value'];
+		}
+		$result = $this->persistence->select(Foo::class, 'SELECT * FROM foo WHERE id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ') OR id IN (' . (count($argumentIds) === 0 ? 'NULL' : '?' . str_repeat(', ?', count($argumentIds) - 1)) . ')', [...$argumentIds, ...$argumentIds]);
 
 		return iterator_to_array($result);
 	}

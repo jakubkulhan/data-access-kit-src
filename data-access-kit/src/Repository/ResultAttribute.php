@@ -17,6 +17,9 @@ class ResultAttribute implements Stringable
 	{
 	}
 
+	/**
+	 * @param array<int|string, mixed> $arguments
+	 */
 	public function setArguments(array $arguments): static
 	{
 		$this->arguments = $arguments;
@@ -40,7 +43,7 @@ class ResultAttribute implements Stringable
 		$arguments = [];
 		foreach ($this->arguments as $key => $value) {
 			if (is_numeric($key)) {
-				$arguments[] = Compiler::varExport($value, true);
+				$arguments[] = Compiler::varExport($value);
 			} else {
 				$arguments[] = $key . ": " . Compiler::varExport($value);
 			}

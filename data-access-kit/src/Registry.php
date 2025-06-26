@@ -36,7 +36,7 @@ class Registry
 
 		if (isset($this->tablesByClassName[$className])) {
 			if ($requireTable && $this->tablesByClassName[$className]->name === null) {
-				throw static::missingTableException($className);
+				throw self::missingTableException($className);
 			}
 			return $this->tablesByClassName[$className];
 		}
@@ -51,7 +51,7 @@ class Registry
 		$tableRA = $rc->getAttributes(Table::class)[0] ?? null;
 		if ($tableRA === null) {
 			if ($requireTable) {
-				throw static::missingTableException($className);
+				throw self::missingTableException($className);
 			}
 
 			$table = new Table();

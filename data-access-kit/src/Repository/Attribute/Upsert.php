@@ -7,6 +7,9 @@ use Attribute;
 #[Attribute(Attribute::TARGET_METHOD)]
 class Upsert
 {
+	/**
+	 * @param array<string>|null $columns
+	 */
 	public function __construct(
 		public readonly ?array $columns = null,
 	)

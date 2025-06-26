@@ -14,6 +14,9 @@ class DefaultNameConverter implements NameConverterInterface
 	{
 	}
 
+	/**
+	 * @param ReflectionClass<object>|string $reflection
+	 */
 	public function classToTable(ReflectionClass|string $reflection): string
 	{
 		if ($reflection instanceof ReflectionClass) {

@@ -19,7 +19,7 @@ interface PersistenceInterface
 	 * Run SELECT $sql with $parameters and return a scalar value.
 	 *
 	 * @param string $sql
-	 * @param array $parameters
+	 * @param array<int|string, mixed> $parameters
 	 * @return scalar
 	 */
 	public function selectScalar(string $sql, array $parameters = []): mixed;
@@ -28,7 +28,7 @@ interface PersistenceInterface
 	 * Run INSERT, UPDATE, or DELETE $sql with $parameters and return the number of affected rows.
 	 *
 	 * @param string $sql
-	 * @param array $parameters
+	 * @param array<int|string, mixed> $parameters
 	 * @return int
 	 */
 	public function execute(string $sql, array $parameters = []): int;
@@ -36,26 +36,30 @@ interface PersistenceInterface
 	/**
 	 * Insert data into the database.
 	 *
-	 * @param object|array $data
+	 * @param object|array<string, mixed> $data
 	 */
 	public function insert(object|array $data): void;
 
 	/**
 	 * Insert or update data in the database.
 	 *
-	 * @param object|array $data
+	 * @param object|array<string, mixed> $data
+	 * @param array<string>|null $columns
 	 */
 	public function upsert(object|array $data, ?array $columns = null): void;
 
 	/**
 	 * Update data in the database based on its primary key.
+	 *
+	 * @param object $data
+	 * @param array<string>|null $columns
 	 */
 	public function update(object $data, ?array $columns = null): void;
 
 	/**
 	 * Delete data from the database based on its primary key.
 	 *
-	 * @param object|array $data
+	 * @param object|array<string, mixed> $data
 	 */
 	public function delete(object|array $data): void;
 
@@ -63,7 +67,7 @@ interface PersistenceInterface
 	 * Convert $object to an associative array.
 	 *
 	 * @param object $object
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function toRow(object $object): array;
 }

@@ -10,12 +10,12 @@ final class DelegateToInterfaceRepository implements DelegateToInterfaceReposito
 	{
 	}
 
-	public function alias(): int
+	public function computeTheAnswer(): int
 	{
 		return $this->deepThoughtInterface->computeTheAnswer(...func_get_args());
 	}
 
-	public function computeTheAnswer(): int
+	public function alias(): int
 	{
 		return $this->deepThoughtInterface->computeTheAnswer(...func_get_args());
 	}

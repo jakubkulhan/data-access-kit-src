@@ -205,6 +205,9 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		}
 	}
 
+	/**
+	 * @return array{0: array<string>, 1: array<string>}
+	 */
 	private function expandSQLMacrosAndVariables(ResultMethod $method, Result $result, SQL $attribute): array
 	{
 		$table = $this->registry->get($result->repository->class, true);
@@ -261,7 +264,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 						}
 
 						$sqlParameterExpressions[] = "...\${$argumentVariableName}";
-						return static::DELIMITER . $argumentVariableName . static::DELIMITER;
+						return self::DELIMITER . $argumentVariableName . self::DELIMITER;
 
 					} else {
 						$sqlParameterExpressions[] = '$arguments[' . Compiler::varExport($rp->getName()) . ']';
@@ -332,7 +335,7 @@ class SQLMethodCompiler implements MethodCompilerInterface
 		}
 
 		$sqlPartExpressions = [];
-		foreach (explode(static::DELIMITER, $sql) as $index => $part) {
+		foreach (explode(self::DELIMITER, $sql) as $index => $part) {
 			if ($index % 2 === 0) {
 				$sqlPartExpressions[] = Compiler::varExport($part);
 			} else {

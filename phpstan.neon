@@ -1,0 +1,12 @@
+parameters:
+    level: 6
+    paths:
+        - data-access-kit/src
+        - data-access-kit-symfony/src
+    
+    # Handle the Symfony config bundle issue
+    ignoreErrors:
+        - '#Call to an undefined method Symfony\\Component\\Config\\Definition\\Builder\\NodeDefinition::children\(\)#'
+    
+    # Be more lenient with some type issues during migration
+    treatPhpDocTypesAsCertain: false 
