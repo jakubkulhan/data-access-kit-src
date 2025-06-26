@@ -136,7 +136,7 @@ class Registry
 	public function maybeGet(object|string $objectOrClass, bool $requireTable = false): ?Table
 	{
 		try {
-			return $this->get(...func_get_args());
+			return $this->get($objectOrClass, $requireTable);
 		} catch (LogicException) {
 			return null;
 		}

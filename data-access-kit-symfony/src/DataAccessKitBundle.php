@@ -112,15 +112,19 @@ class DataAccessKitBundle extends AbstractBundle
 	 */
 	private function configureGlobalServices(array $config, ServicesConfigurator $services, ContainerBuilder $builder): void
 	{
-		$services->set($config["name_converter"])->autowire();
-		$services->alias(NameConverterInterface::class, $config["name_converter"]);
+		/** @var string $nameConverter */
+		$nameConverter = $config["name_converter"];
+		$services->set($nameConverter)->autowire();
+		$services->alias(NameConverterInterface::class, $nameConverter);
 
 		$services->set(Registry::class)->autowire();
 
-		if (!$builder->hasDefinition($config["value_converter"])) {
-			$services->set($config["value_converter"])->autowire();
+		/** @var string $valueConverter */
+		$valueConverter = $config["value_converter"];
+		if (!$builder->hasDefinition($valueConverter)) {
+			$services->set($valueConverter)->autowire();
 		}
-		$services->alias(ValueConverterInterface::class, $config["value_converter"]);
+		$services->alias(ValueConverterInterface::class, $valueConverter);
 	}
 
 	/**
@@ -128,12 +132,18 @@ class DataAccessKitBundle extends AbstractBundle
 	 */
 	private function configureDatabaseServices(array $config, ServicesConfigurator $services): void
 	{
-		foreach ($config["databases"] as $name => $database) {
+		/** @var array<string, array<string, mixed>> $databases */
+		$databases = $config["databases"];
+		foreach ($databases as $name => $database) {
+			/** @var string $connection */
+			$connection = $database["connection"];
 			$services->set($this->persistenceId($name), Persistence::class)
-				->arg("\$connection", new Reference($database["connection"]))
+				->arg("\$connection", new Reference($connection))
 				->autowire();
 
-			if ($name === $config["default_database"]) {
+			/** @var string $defaultDatabase */
+			$defaultDatabase = $config["default_database"];
+			if ($name === $defaultDatabase) {
 				$services->alias(PersistenceInterface::class, $this->persistenceId($name));
 			}
 		}
@@ -149,17 +159,28 @@ class DataAccessKitBundle extends AbstractBundle
 		$nameConverter = new $nameConverterClass();
 		$registry = new Registry($nameConverter);
 		$compiler = new Compiler($registry);
-		$outputDir = $builder->getParameterBag()->resolveValue("%kernel.cache_dir%") . DIRECTORY_SEPARATOR . "DataAccessKit";
+		
+		/** @var string $outputDirValue */
+		$outputDirValue = $builder->getParameterBag()->resolveValue("%kernel.cache_dir%");
+		$outputDir = $outputDirValue . DIRECTORY_SEPARATOR . "DataAccessKit";
+		
+		/** @var bool $debug */
 		$debug = $builder->getParameterBag()->resolveValue("%kernel.debug%");
 
-		foreach ($config["repositories"] as $namespace => $repository) {
+		/** @var array<string, array<string, mixed>> $repositories */
+		$repositories = $config["repositories"];
+		foreach ($repositories as $namespace => $repository) {
+			/** @var string $path */
+			$path = $repository["path"];
 			$finder = (new Finder())
-				->in($repository["path"])
+				->in($path)
 				->files()
 				->name("*.php");
 
-			if (count($repository["exclude"]) > 0) {
-				$finder->notName($repository["exclude"]);
+			/** @var array<string> $excludePatterns */
+			$excludePatterns = $repository["exclude"];
+			if (count($excludePatterns) > 0) {
+				$finder->notName($excludePatterns);
 			}
 
 			foreach ($finder as $file) {
@@ -177,7 +198,10 @@ class DataAccessKitBundle extends AbstractBundle
 					$cfg->arg('$' . Compiler::PERSISTENCE_PROPERTY, new Reference($this->persistenceId($result->repository->database)));
 				}
 				$aliasCfg = $services->alias($result->reflection->getName(), $result->getName());
-				if ($config["repositories_public"]) {
+				
+				/** @var bool $repositoriesPublic */
+				$repositoriesPublic = $config["repositories_public"];
+				if ($repositoriesPublic) {
 					$aliasCfg->public();
 				}
 			}

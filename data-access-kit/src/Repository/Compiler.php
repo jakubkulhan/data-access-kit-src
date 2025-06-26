@@ -207,6 +207,9 @@ class Compiler
 			}
 			$method->setReturnType(static::phpType($result, $rm->getReturnType()));
 
+			if ($methodCompilerAttribute === null) {
+				throw new CompilerException("Method compiler attribute should not be null at this point");
+			}
 			$methodCompiler->compile($result, $method, $methodCompilerAttribute);
 		}
 

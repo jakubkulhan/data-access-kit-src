@@ -62,7 +62,13 @@ class DefaultValueConverter implements ValueConverterInterface
 					} else {
 						$nestedTable = $this->registry->get($column->itemType);
 						$jsonArray = [];
+						if (!is_iterable($value)) {
+							throw new ConverterException("Expected iterable value for array type");
+						}
 						foreach ($value as $item) {
+							if (!is_object($item)) {
+								throw new ConverterException("Expected object in array value");
+							}
 							$jsonArray[] = $jsonObject = new stdClass();
 							foreach ($nestedTable->columns as $nestedColumn) {
 								$jsonObject->{$nestedColumn->name} = $this->objectToDatabase(
@@ -87,6 +93,9 @@ class DefaultValueConverter implements ValueConverterInterface
 						$returnValue = $value->name;
 					}
 				} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
+					if (!is_object($value)) {
+						throw new ConverterException("Expected object value for nested type");
+					}
 					$jsonObject = new stdClass();
 					foreach ($nestedTable->columns as $nestedColumn) {
 						$jsonObject->{$nestedColumn->name} = $this->objectToDatabase(
@@ -133,14 +142,30 @@ class DefaultValueConverter implements ValueConverterInterface
 			if (in_array($valueType->getName(), ["int", "float", "string", "bool"], true)) {
 				$returnValue = $value;
 			} else if ($valueType->getName() === "object") {
+				if (!is_string($value)) {
+					throw new ConverterException("Expected string value for JSON decoding");
+				}
+				/** @var string $value */
 				$returnValue = $decode ? json_decode($value) : $value;
 			} else if ($valueType->getName() === "array") {
 				if ($column->itemType === null) {
+					if (!is_string($value)) {
+						throw new ConverterException("Expected string value for JSON decoding");
+					}
+					/** @var string $value */
 					$returnValue = $decode ? json_decode($value) : $value;
 				} else {
 					$nestedTable = $this->registry->get($column->itemType);
 					$array = [];
-					foreach ($decode ? json_decode($value) : $value as $jsonObject) {
+					if ($decode && !is_string($value)) {
+						throw new ConverterException("Expected string value for JSON decoding");
+					}
+					/** @var string $value */
+					$decodedValue = $decode ? json_decode($value) : $value;
+					if (!is_iterable($decodedValue)) {
+						throw new ConverterException("Expected iterable value for array type");
+					}
+					foreach ($decodedValue as $jsonObject) {
 						$nestedObject = $nestedTable->reflection->newInstanceWithoutConstructor();
 						foreach ($nestedTable->columns as $nestedColumn) {
 							$nestedColumn->reflection->setValue(
@@ -160,6 +185,9 @@ class DefaultValueConverter implements ValueConverterInterface
 			} else if (in_array($valueType->getName(), [DateTime::class, DateTimeImmutable::class], true)) {
 				/** @var class-string<DateTime|DateTimeImmutable> $className */
 				$className = $valueType->getName();
+				if (!is_string($value)) {
+					throw new ConverterException("Expected string value for DateTime conversion");
+				}
 				$returnValue = $className::createFromFormat($this->dateTimeFormat, $value, $this->dateTimeZone);
 				if ($returnValue === false) {
 					try {
@@ -167,7 +195,7 @@ class DefaultValueConverter implements ValueConverterInterface
 					} catch (\Exception $e) {
 						throw new ConverterException(sprintf(
 							"Could not parse datetime value [%s] for property [%s::\$%s].",
-							$value,
+							(string) $value,
 							$table->reflection->getName(),
 							$column->reflection->getName()
 						));
@@ -181,6 +209,9 @@ class DefaultValueConverter implements ValueConverterInterface
 				if ($enumReflection->isBacked()) {
 					// Backed enum - use from() method
 					/** @var class-string<BackedEnum> $className */
+					if (!is_int($value) && !is_string($value)) {
+						throw new ConverterException("Expected int or string value for backed enum");
+					}
 					$returnValue = $className::from($value);
 				} else {
 					// Unit enum - find case by name
@@ -193,9 +224,10 @@ class DefaultValueConverter implements ValueConverterInterface
 						}
 					}
 					if ($returnValue === null) {
+						$valueStr = is_scalar($value) ? (string) $value : get_debug_type($value);
 						throw new ConverterException(sprintf(
 							"Could not find enum case [%s] for enum [%s] in property [%s::\$%s].",
-							$value,
+							$valueStr,
 							$className,
 							$table->reflection->getName(),
 							$column->reflection->getName()
@@ -203,6 +235,10 @@ class DefaultValueConverter implements ValueConverterInterface
 					}
 				}
 			} else if (null !== ($nestedTable = $this->registry->maybeGet($valueType->getName()))) {
+				if ($decode && !is_string($value)) {
+					throw new ConverterException("Expected string value for JSON decoding");
+				}
+				/** @var string $value */
 				$jsonObject = $decode ? json_decode($value) : $value;
 				$nestedObject = $nestedTable->reflection->newInstanceWithoutConstructor();
 				foreach ($nestedTable->columns as $nestedColumn) {

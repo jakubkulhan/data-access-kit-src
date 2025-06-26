@@ -63,11 +63,18 @@ class Persistence implements PersistenceInterface
 		}
 	}
 
-	public function selectScalar(string $sql, array $parameters = []): mixed
+	public function selectScalar(string $sql, array $parameters = []): bool|float|int|string|null
 	{
 		/** @var array<int<0, max>|string, mixed> $dbParams */
 		$dbParams = $parameters;
-		return $this->connection->executeQuery($sql, $dbParams)->fetchOne();
+		$result = $this->connection->executeQuery($sql, $dbParams)->fetchOne();
+		if (!is_bool($result) && !is_float($result) && !is_int($result) && !is_string($result) && $result !== null) {
+			throw new PersistenceException(sprintf(
+				"Expected scalar value, got %s.",
+				get_debug_type($result)
+			));
+		}
+		return $result;
 	}
 
 	public function execute(string $sql, array $parameters = []): int
@@ -89,7 +96,9 @@ class Persistence implements PersistenceInterface
 		if (!is_array($data)) {
 			$data = [$data];
 		}
-		$this->doInsert($data, []);
+		/** @var array<object> $objectData */
+		$objectData = $data;
+		$this->doInsert($objectData, []);
 	}
 
 	public function upsert(object|array $data, ?array $columns = null): void
@@ -101,7 +110,9 @@ class Persistence implements PersistenceInterface
 		if (!is_array($data)) {
 			$data = [$data];
 		}
-		$this->doInsert($data, $columns);
+		/** @var array<object> $objectData */
+		$objectData = $data;
+		$this->doInsert($objectData, $columns);
 	}
 
 	/**
@@ -390,7 +401,11 @@ class Persistence implements PersistenceInterface
 			return;
 		}
 
-		$table = $this->registry->get($data[0], true);
+		$firstObject = $data[0];
+		if (!is_object($firstObject)) {
+			throw new PersistenceException("Expected object in data array");
+		}
+		$table = $this->registry->get($firstObject, true);
 		$platform = $this->connection->getDatabasePlatform();
 
 		$where = [];
@@ -405,6 +420,9 @@ class Persistence implements PersistenceInterface
 		}
 
 		foreach ($data as $object) {
+			if (!is_object($object)) {
+				throw new PersistenceException("Expected object in data array");
+			}
 			$rowWhere = [];
 			foreach ($primaryColumns as $column) {
 				if (!$column->reflection->isInitialized($object)) {

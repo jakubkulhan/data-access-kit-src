@@ -1,5 +1,5 @@
 parameters:
-    level: 8
+    level: 9
     paths:
         - data-access-kit/src
         - data-access-kit-symfony/src
@@ -7,6 +7,8 @@ parameters:
     # Handle the Symfony config bundle issue
     ignoreErrors:
         - '#Call to an undefined method Symfony\\Component\\Config\\Definition\\Builder\\NodeDefinition::children\(\)#'
+        # Ignore template covariance issues that don't affect runtime
+        - '#DataAccessKit\\Repository\\Compiler::registerMethodCompiler\(\) expects DataAccessKit\\Repository\\MethodCompilerInterface<mixed>#'
     
     # Be more lenient with some type issues during migration
     treatPhpDocTypesAsCertain: false 
