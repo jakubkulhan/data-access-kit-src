@@ -30,7 +30,17 @@
     },
     "scripts": {
         "test:unit": "./vendor/bin/phpunit --group unit",
-        "test:database": "./vendor/bin/phpunit --group database",
+        "test:database:env": "./vendor/bin/phpunit --group database",
+        "test:database:mysql": "DATABASE_URL=pdo-mysql://root@127.0.0.1:32016/DataAccessKit composer run test:database:env",
+        "test:database:mariadb": "DATABASE_URL=pdo-mysql://root@127.0.0.1:35098/DataAccessKit composer run test:database:env",
+        "test:database:postgres": "DATABASE_URL=pdo-pgsql://postgres:postgres@127.0.0.1:55720/DataAccessKit composer run test:database:env",
+        "test:database:sqlite": "DATABASE_URL=pdo-sqlite:///:memory: composer run test:database:env",
+        "test:database:all": [
+            "@test:database:mysql",
+            "@test:database:mariadb",
+            "@test:database:postgres",
+            "@test:database:sqlite"
+        ],
         "test:phpstan": "./vendor/bin/phpstan analyse data-access-kit/src data-access-kit-symfony/src --memory-limit=512M"
     }
 }
