@@ -8,10 +8,10 @@ use ReflectionClass;
 #[Attribute(Attribute::TARGET_CLASS)]
 class Table
 {
-	public readonly ReflectionClass $reflection;
+	public ReflectionClass $reflection;
 
 	/** @var Column[] */
-	public readonly array $columns;
+	public array $columns;
 
 	public function __construct(
 		public ?string $name = null,

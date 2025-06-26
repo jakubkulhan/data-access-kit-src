@@ -8,7 +8,17 @@ jobs:
         with:
           php-version: '8.3'
       - uses: php-actions/composer@v6
-      - run: ./vendor/bin/phpunit --group unit
+      - run: composer test:unit
+
+  test-phpstan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - uses: php-actions/composer@v6
+      - run: composer test:phpstan
 
   test-database:
     runs-on: ubuntu-latest
@@ -41,4 +51,6 @@ jobs:
         with:
           php-version: '8.3'
       - uses: php-actions/composer@v6
-      - run: DATABASE_URL=${{ matrix.database.database_url }} ./vendor/bin/phpunit --group database
+      - run: composer test:database
+        env:
+          DATABASE_URL: ${{ matrix.database.database_url }}

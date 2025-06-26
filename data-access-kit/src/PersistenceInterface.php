@@ -36,16 +36,14 @@ interface PersistenceInterface
 	/**
 	 * Insert data into the database.
 	 *
-	 * @template T
-	 * @param T|T[] $data
+	 * @param object|array $data
 	 */
 	public function insert(object|array $data): void;
 
 	/**
 	 * Insert or update data in the database.
 	 *
-	 * @template T
-	 * @param T|T[] $data
+	 * @param object|array $data
 	 */
 	public function upsert(object|array $data, ?array $columns = null): void;
 
@@ -57,8 +55,7 @@ interface PersistenceInterface
 	/**
 	 * Delete data from the database based on its primary key.
 	 *
-	 * @template T
-	 * @param T|T[] $data
+	 * @param object|array $data
 	 */
 	public function delete(object|array $data): void;
 

@@ -11,7 +11,7 @@ use function str_repeat;
 class ResultMethod implements Stringable
 {
 
-	public readonly ReflectionMethod $reflection;
+	public ReflectionMethod $reflection;
 
 	private string $visibility = "public";
 	/** @var array<string, ResultParameter> */

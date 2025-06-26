@@ -8,7 +8,7 @@ use ReflectionProperty;
 #[Attribute(Attribute::TARGET_PROPERTY)]
 class Column
 {
-	public readonly ReflectionProperty $reflection;
+	public ReflectionProperty $reflection;
 
 	public function __construct(
 		public ?string $name = null,
