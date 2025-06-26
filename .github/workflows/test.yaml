@@ -51,6 +51,6 @@ jobs:
         with:
           php-version: '8.3'
       - uses: php-actions/composer@v6
-      - run: composer test:database
+      - run: composer test:database:env
         env:
           DATABASE_URL: ${{ matrix.database.database_url }}
