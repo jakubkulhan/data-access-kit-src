@@ -428,19 +428,10 @@ foreach ($stream as $event) {
 
 ### Interface Declaration Strategy
 
-Since ext-php-rs doesn't support creating PHP interfaces directly from Rust, the interfaces must be declared by executing PHP code during extension startup. This uses Method 4 from the implementation guide:
-
-**Development Mode** (debug builds):
-- Load interface definitions from external PHP files
-- Allows for easy development and testing
-
-**Production Mode** (release builds):
-- Embed interface definitions at compile time using `include_str!()`
-- No external file dependencies in production
+Since ext-php-rs doesn't support creating PHP interfaces directly from Rust, the interfaces must be declared by executing PHP code during extension startup. The extension embeds interface definitions at compile time using `include_str!()` to ensure no external file dependencies.
 
 ```rust
 use ext_php_rs::prelude::*;
-use std::fs;
 
 #[php_startup]
 pub fn startup() {
@@ -450,21 +441,8 @@ pub fn startup() {
 }
 
 fn load_extension_interfaces() -> PhpResult<()> {
-    // Development - load from filesystem
-    #[cfg(debug_assertions)]
-    {
-        if let Ok(code) = fs::read_to_string("./interfaces/replication.php") {
-            execute_php_code(&code)?
-        }
-    }
-    
-    // Production - use embedded code
-    #[cfg(not(debug_assertions))]
-    {
-        let embedded_interfaces = include_str!("../interfaces/replication.php");
-        execute_php_code(embedded_interfaces)?
-    }
-    
+    let embedded_interfaces = include_str!("../interfaces/replication.php");
+    execute_php_code(embedded_interfaces)?;
     Ok(())
 }
 
@@ -591,8 +569,6 @@ pub struct DeleteEvent {
 ## Extension Metadata
 
 ### Build Process
-
-**Development Build:**
 ```bash
 # Create interfaces directory
 mkdir -p interfaces
@@ -624,13 +600,7 @@ namespace DataAccessKit\Replication {
 }
 EOF
 
-# Development build (loads from filesystem)
-cargo build
-```
-
-**Production Build:**
-```bash
-# Production build (embeds interfaces at compile time)
+# Build (embeds interfaces at compile time)
 cargo build --release
 ```
 
@@ -730,7 +700,7 @@ echo "DataAccessKit Replication extension loaded successfully\n";
 
 **Running Tests:**
 ```bash
-# Build the extension
+# Build the extension (interfaces embedded at compile time)
 cargo build --release
 
 # Copy extension to local directory (no sudo needed)
