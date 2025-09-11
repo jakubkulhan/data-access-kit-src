@@ -1,0 +1,27 @@
+{
+    "name": "data-access-kit/replication",
+    "description": "DataAccessKit Replication Extension",
+    "type": "php-ext",
+    "require": {
+        "php": ">=8.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "DataAccessKit\\Replication\\Test\\": "test/"
+        }
+    },
+    "scripts": {
+        "build": "cargo build --release",
+        "test": [
+            "@build",
+            "php -c php.ini vendor/bin/phpunit"
+        ],
+        "test-coverage": [
+            "@build", 
+            "php -c php.ini vendor/bin/phpunit --coverage-html coverage"
+        ]
+    }
+}

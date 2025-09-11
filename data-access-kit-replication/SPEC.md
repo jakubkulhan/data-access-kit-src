@@ -497,7 +497,7 @@ namespace DataAccessKit\Replication {
 
 ```toml
 [dependencies]
-ext-php-rs = "0.11"
+ext-php-rs = "0.14.2"
 mysql_async = "0.33"
 mysql-binlog-connector-rust = { git = "https://github.com/apecloud/mysql-binlog-connector-rust" }
 tokio = { version = "1.0", features = ["full"] }
@@ -719,34 +719,27 @@ php -c php.ini vendor/bin/phpunit test/StreamTest.php
 php -c php.ini vendor/bin/phpunit --coverage-html coverage
 ```
 
-**Example Test** (`test/StreamTest.php`):
+**Example Tests** (separate files for each interface):
 ```php
 <?php
 
 namespace DataAccessKit\Replication\Test;
 
 use PHPUnit\Framework\TestCase;
-use DataAccessKit\Replication\{Stream, EventInterface};
+use DataAccessKit\Replication\EventInterface;
 
-class StreamTest extends TestCase
+class EventInterfaceTest extends TestCase
 {
-    public function testStreamConstruction(): void
+    public function testEventInterfaceExists(): void
     {
-        $stream = new Stream('mysql://user:pass@localhost:3306?server_id=100');
-        $this->assertInstanceOf(Stream::class, $stream);
+        $this->assertTrue(interface_exists(EventInterface::class));
     }
     
-    public function testEventConstants(): void
+    public function testEventInterfaceConstants(): void
     {
         $this->assertEquals('INSERT', EventInterface::INSERT);
         $this->assertEquals('UPDATE', EventInterface::UPDATE);
         $this->assertEquals('DELETE', EventInterface::DELETE);
-    }
-    
-    public function testStreamImplementsIterator(): void
-    {
-        $stream = new Stream('mysql://user:pass@localhost:3306?server_id=100');
-        $this->assertInstanceOf(\Iterator::class, $stream);
     }
 }
 ```
@@ -760,9 +753,9 @@ data-access-kit-replication/
 │   └── replication.php    # Interface definitions
 ├── test/                  # PHPUnit test directory
 │   ├── bootstrap.php
-│   ├── StreamTest.php
-│   ├── CheckpointerTest.php
-│   └── FilterTest.php
+│   ├── EventInterfaceTest.php
+│   ├── StreamCheckpointerInterfaceTest.php
+│   └── StreamFilterInterfaceTest.php
 ├── Cargo.toml
 ├── composer.json          # PHPUnit dependency
 ├── php.ini                # Local PHP configuration
