@@ -14,35 +14,129 @@ use Exception;
 #[Group("database")]
 class StreamIntegrationTest extends TestCase
 {
-    public function testCompleteStreamFlow(): void
+    private ?string $originalBinlogFormat = null;
+    private ?string $originalBinlogRowImage = null;
+    private ?string $originalBinlogRowMetadata = null;
+    private ?\PDO $pdo = null;
+    private ?array $dbConfig = null;
+
+    protected function setUp(): void
     {
-        // Check for required DATABASE_URL environment variable
         $databaseUrl = $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL');
         if (!$databaseUrl) {
-            $this->fail('DATABASE_URL environment variable is required but not set. Example: mysql://user:password@host:3306');
+            return; // Skip setup if no database URL
         }
         
-        // Parse database URL to extract connection components
         $parsedUrl = parse_url($databaseUrl);
-        if (!$parsedUrl) {
-            $this->fail('Invalid DATABASE_URL format. Expected: mysql://user:password@host:3306');
+        $this->dbConfig = [
+            'host' => $parsedUrl['host'] ?? 'localhost',
+            'port' => $parsedUrl['port'] ?? 3306,
+            'user' => $parsedUrl['user'] ?? 'root',
+            'password' => $parsedUrl['pass'] ?? '',
+        ];
+        
+        try {
+            $this->pdo = new \PDO(
+                "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']}", 
+                $this->dbConfig['user'], 
+                $this->dbConfig['password']
+            );
+            
+            // Store original values
+            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_format");
+            $this->originalBinlogFormat = $stmt->fetchColumn();
+            
+            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_row_image");
+            $this->originalBinlogRowImage = $stmt->fetchColumn();
+            
+            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_row_metadata");
+            $this->originalBinlogRowMetadata = $stmt->fetchColumn();
+            
+            // Set correct values for tests using prepared statements
+            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
+            $stmt->execute(['ROW']);
+            
+            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
+            $stmt->execute(['FULL']);
+            
+            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
+            $stmt->execute(['FULL']);
+            
+        } catch (\Exception $e) {
+            // Ignore setup errors for tests that don't need database
+        }
+    }
+    
+    protected function tearDown(): void
+    {
+        if ($this->pdo === null) {
+            return;
         }
         
-        $host = $parsedUrl['host'] ?? 'localhost';
-        $port = $parsedUrl['port'] ?? 3306;
-        $user = $parsedUrl['user'] ?? 'root';
-        $password = $parsedUrl['pass'] ?? '';
+        try {
+            // Restore original values using prepared statements
+            if ($this->originalBinlogFormat !== null) {
+                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
+                $stmt->execute([$this->originalBinlogFormat]);
+            }
+            if ($this->originalBinlogRowImage !== null) {
+                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
+                $stmt->execute([$this->originalBinlogRowImage]);
+            }
+            if ($this->originalBinlogRowMetadata !== null) {
+                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
+                $stmt->execute([$this->originalBinlogRowMetadata]);
+            }
+        } catch (\Exception $e) {
+            // Ignore teardown errors
+        }
+        
+        $this->pdo = null;
+        $this->dbConfig = null;
+    }
+
+    private function createConnectionUrl(array $params = []): string
+    {
+        if ($this->dbConfig === null) {
+            throw new \Exception('Database configuration not available');
+        }
+        
+        // Extract database from params if provided
+        $database = isset($params['database']) ? '/' . $params['database'] : '';
+        unset($params['database']); // Remove from query params
+        
+        $queryParams = array_merge(['server_id' => '100'], $params);
+        $queryString = http_build_query($queryParams);
+        
+        return sprintf(
+            'mysql://%s:%s@%s:%d%s?%s',
+            $this->dbConfig['user'],
+            $this->dbConfig['password'],
+            $this->dbConfig['host'],
+            $this->dbConfig['port'],
+            $database,
+            $queryString
+        );
+    }
+    public function testCompleteStreamFlow(): void
+    {
+        if ($this->pdo === null) {
+            $this->markTestSkipped('DATABASE_URL environment variable is required');
+        }
         
         $stream = null;
         
         try {
-            // Set up test database using parsed connection info
-            $basePdo = new \PDO("mysql:host={$host};port={$port}", $user, $password);
-            $basePdo->exec("CREATE DATABASE IF NOT EXISTS `test_replication_db`");
-            $basePdo->exec("USE `test_replication_db`");
+            // Set up test database using existing PDO connection
+            $this->pdo->exec("CREATE DATABASE IF NOT EXISTS `test_replication_db`");
+            $this->pdo->exec("USE `test_replication_db`");
             
             // Set up test table
-            $testPdo = new \PDO("mysql:host={$host};port={$port};dbname=test_replication_db", $user, $password);
+            $testPdo = new \PDO(
+                "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']};dbname=test_replication_db", 
+                $this->dbConfig['user'], 
+                $this->dbConfig['password']
+            );
             $testPdo->exec("
                 CREATE TABLE IF NOT EXISTS `test_users` (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -53,21 +147,13 @@ class StreamIntegrationTest extends TestCase
             ");
             
             // Create stream with MySQL connection using test database
-            $connectionUrl = sprintf(
-                'mysql://%s:%s@%s:%d/test_replication_db?server_id=100',
-                $user,
-                $password,
-                $host,
-                $port
-            );
-            $stream = new Stream($connectionUrl);
+            $stream = new Stream($this->createConnectionUrl(['database' => 'test_replication_db']));
             $this->assertInstanceOf(Stream::class, $stream);
             
             // Test 1: Connect to database
             $stream->connect();
             
             // Test 2: Insert test data to generate INSERT event
-            $testPdo = new \PDO("mysql:host={$host};port={$port};dbname=test_replication_db", $user, $password);
             $testPdo->exec("
                 INSERT INTO `test_users` (name, email) VALUES 
                 ('John Doe', 'john@example.com')
@@ -166,7 +252,11 @@ class StreamIntegrationTest extends TestCase
             
             // Cleanup: drop test table
             try {
-                $cleanupPdo = new \PDO("mysql:host={$host};port={$port};dbname=test_replication_db", $user, $password);
+                $cleanupPdo = new \PDO(
+                    "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']};dbname=test_replication_db", 
+                    $this->dbConfig['user'], 
+                    $this->dbConfig['password']
+                );
                 $cleanupPdo->exec("DROP TABLE IF EXISTS `test_users`");
             } catch (Exception $e) {
                 // Ignore cleanup errors
@@ -174,11 +264,63 @@ class StreamIntegrationTest extends TestCase
             
             // Cleanup: drop test database
             try {
-                $cleanupPdo = new \PDO("mysql:host={$host};port={$port}", $user, $password);
-                $cleanupPdo->exec("DROP DATABASE IF EXISTS `test_replication_db`");
+                $this->pdo->exec("DROP DATABASE IF EXISTS `test_replication_db`");
             } catch (Exception $e) {
                 // Ignore cleanup errors
             }
         }
     }
+
+
+    public function testMysqlConfigurationValidationBinlogFormatFailure(): void
+    {
+        if ($this->pdo === null) {
+            $this->markTestSkipped('DATABASE_URL environment variable is required');
+        }
+        
+        // Set invalid binlog_format globally
+        $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
+        $stmt->execute(['STATEMENT']);
+        
+        $stream = new Stream($this->createConnectionUrl());
+        
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessageMatches('/binlog_format must be ROW/i');
+        $stream->connect();
+    }
+
+    public function testMysqlConfigurationValidationBinlogRowImageFailure(): void
+    {
+        if ($this->pdo === null) {
+            $this->markTestSkipped('DATABASE_URL environment variable is required');
+        }
+        
+        // Set invalid binlog_row_image globally
+        $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
+        $stmt->execute(['MINIMAL']);
+        
+        $stream = new Stream($this->createConnectionUrl());
+        
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessageMatches('/binlog_row_image must be FULL/i');
+        $stream->connect();
+    }
+
+    public function testMysqlConfigurationValidationBinlogRowMetadataFailure(): void
+    {
+        if ($this->pdo === null) {
+            $this->markTestSkipped('DATABASE_URL environment variable is required');
+        }
+        
+        // Set invalid binlog_row_metadata globally
+        $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
+        $stmt->execute(['MINIMAL']);
+        
+        $stream = new Stream($this->createConnectionUrl());
+        
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessageMatches('/binlog_row_metadata must be FULL/i');
+        $stream->connect();
+    }
+
 }
