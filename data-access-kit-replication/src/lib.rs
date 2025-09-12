@@ -3,66 +3,129 @@ use ext_php_rs::ffi;
 use ext_php_rs::types::Zval;
 use ext_php_rs::zend::ce;
 use std::sync::Once;
+use url::Url;
+
+mod mysql;
+use mysql::MySQLStreamDriver;
 
 static INTERFACES_INIT: Once = Once::new();
+
+trait StreamDriver: std::fmt::Debug {
+    fn connect(&mut self) -> PhpResult<()>;
+    fn disconnect(&mut self) -> PhpResult<()>;
+    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()>;
+    fn set_filter(&mut self, filter: &Zval) -> PhpResult<()>;
+    fn current(&self) -> PhpResult<Option<Zval>>;
+    fn key(&self) -> PhpResult<i32>;
+    fn next(&mut self) -> PhpResult<()>;
+    fn rewind(&mut self) -> PhpResult<()>;
+    fn valid(&self) -> PhpResult<bool>;
+}
 
 #[php_class]
 #[php(name = "DataAccessKit\\Replication\\Stream")]
 #[php(implements(ce = ce::iterator, stub = "Iterator"))]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Stream {
-    connection_url: String,
-    connected: bool,
+    driver: Box<dyn StreamDriver>,
     position: u64,
+}
+
+impl Stream {
+    fn create_driver(connection_url: &str) -> Result<Box<dyn StreamDriver>, PhpException> {
+        match Url::parse(connection_url) {
+            Ok(url) => {
+                match url.scheme() {
+                    "mysql" => {
+                        let host = url.host_str()
+                            .unwrap_or("localhost")
+                            .to_string();
+                        
+                        let port = url.port().unwrap_or(3306);
+                        
+                        let user = if url.username().is_empty() {
+                            "root".to_string()
+                        } else {
+                            url.username().to_string()
+                        };
+                        
+                        let password = url.password()
+                            .unwrap_or("")
+                            .to_string();
+                        
+                        let database = url.path()
+                            .strip_prefix('/')
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string());
+                        
+                        let server_id = url.query_pairs()
+                            .find(|(key, _)| key == "server_id")
+                            .and_then(|(_, value)| value.parse::<u32>().ok());
+                        
+                        Ok(Box::new(MySQLStreamDriver::new(
+                            host,
+                            port,
+                            user,
+                            password,
+                            database,
+                            server_id,
+                        )))
+                    },
+                    scheme => Err(PhpException::default(format!("Unsupported protocol: {}", scheme).into())),
+                }
+            },
+            Err(e) => Err(PhpException::default(format!("Invalid connection URL: {}", e).into())),
+        }
+    }
 }
 
 #[php_impl]
 impl Stream {
     pub fn __construct(connection_url: String) -> PhpResult<Self> {
+        let driver = Self::create_driver(&connection_url)?;
         Ok(Stream {
-            connection_url,
-            connected: false,
+            driver,
             position: 0,
         })
     }
 
     pub fn connect(&mut self) -> PhpResult<()> {
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.connect()
     }
 
     pub fn disconnect(&mut self) -> PhpResult<()> {
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.disconnect()
     }
 
-    pub fn set_checkpointer(&mut self, _checkpointer: &Zval) -> PhpResult<()> {
-        Ok(())
+    pub fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
+        self.driver.set_checkpointer(checkpointer)
     }
 
-    pub fn set_filter(&mut self, _filter: &Zval) -> PhpResult<()> {
-        Ok(())
+    pub fn set_filter(&mut self, filter: &Zval) -> PhpResult<()> {
+        self.driver.set_filter(filter)
     }
 
     // Iterator interface methods
     pub fn current(&self) -> PhpResult<Option<Zval>> {
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.current()
     }
 
     pub fn key(&self) -> PhpResult<i32> {
-        Ok(self.position as i32)
+        self.driver.key()
     }
 
     pub fn next(&mut self) -> PhpResult<()> {
         self.position += 1;
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.next()
     }
 
     pub fn rewind(&mut self) -> PhpResult<()> {
         self.position = 0;
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.rewind()
     }
 
     pub fn valid(&self) -> PhpResult<bool> {
-        Err(PhpException::default("TODO: will be implemented".into()).into())
+        self.driver.valid()
     }
 }
 
