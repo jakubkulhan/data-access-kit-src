@@ -215,6 +215,10 @@ The extension must validate the following MySQL configuration when connecting:
    - Provides complete column metadata (MySQL 8.0+)
    - Query: `SHOW VARIABLES LIKE 'binlog_row_metadata'`
 
+4. **gtid_mode = ON**
+   - Enables Global Transaction Identifier (GTID) mode
+   - Query: `SHOW VARIABLES LIKE 'gtid_mode'`
+
 ### Validation Process
 
 Validation occurs automatically during connection establishment:

@@ -128,6 +128,32 @@ impl MySQLStreamDriver {
             return Err(format!("binlog_row_metadata must be FULL, got: {}", binlog_row_metadata));
         }
         
+        // Check GTID configuration (MySQL only)
+        // Detect database type by checking version
+        let version: String = mysql_async::prelude::Queryable::query_first(
+            &mut conn,
+            "SELECT VERSION()"
+        ).await
+            .map_err(|e| format!("Failed to query database version: {}", e))?
+            .unwrap_or_default();
+        
+        let is_mariadb = version.to_lowercase().contains("mariadb");
+        
+        if !is_mariadb {
+            // MySQL uses gtid_mode
+            let gtid_mode: String = mysql_async::prelude::Queryable::query_first(
+                &mut conn,
+                "SHOW VARIABLES LIKE 'gtid_mode'"
+            ).await
+                .map_err(|e| format!("Failed to query gtid_mode: {}", e))?
+                .map(|row: (String, String)| row.1)
+                .unwrap_or_default();
+            
+            if gtid_mode.to_uppercase() != "ON" {
+                return Err(format!("gtid_mode must be ON, got: {}", gtid_mode));
+            }
+        }
+        
         Ok(())
     }
     

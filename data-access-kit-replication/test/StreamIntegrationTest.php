@@ -387,4 +387,52 @@ class StreamIntegrationTest extends TestCase
         $stream->connect();
     }
 
+    public function testMysqlConfigurationValidationGtidModeFailure(): void
+    {
+        if ($this->pdo === null) {
+            $this->markTestSkipped('DATABASE_URL environment variable is required');
+        }
+        
+        // Detect database type
+        $stmt = $this->pdo->query("SELECT VERSION()");
+        $version = $stmt->fetchColumn();
+        $isMariaDB = stripos($version, 'mariadb') !== false;
+        
+        if ($isMariaDB) {
+            $this->markTestSkipped('This test is for MySQL only');
+        }
+        
+        // MySQL GTID test
+        $stmt = $this->pdo->query("SELECT @@GLOBAL.gtid_mode");
+        $originalGtidMode = $stmt->fetchColumn();
+        
+        try {
+            // MySQL requires stepping GTID mode: ON -> ON_PERMISSIVE -> OFF_PERMISSIVE -> OFF
+            if ($originalGtidMode === 'ON') {
+                $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'ON_PERMISSIVE'");
+                $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'OFF_PERMISSIVE'");
+                $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'OFF'");
+            }
+            
+            $stream = new Stream($this->createReplicationConnectionUrl());
+            
+            $this->expectException(Exception::class);
+            $this->expectExceptionMessageMatches('/gtid_mode must be ON/i');
+            $stream->connect();
+            
+        } finally {
+            // Restore original GTID mode by stepping back up
+            if ($originalGtidMode === 'ON') {
+                try {
+                    $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'OFF_PERMISSIVE'");
+                    $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'ON_PERMISSIVE'");
+                    $this->pdo->exec("SET @@GLOBAL.gtid_mode = 'ON'");
+                } catch (Exception $e) {
+                    // Ignore errors in cleanup
+                }
+            }
+        }
+    }
+
+
 }
