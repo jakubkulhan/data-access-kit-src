@@ -121,15 +121,31 @@ impl MySQLStreamDriver {
         let mut conn = pool.get_conn().await
             .map_err(|e| format!("Failed to get connection for GTID: {}", e))?;
         
-        // Get current GTID executed set
-        let gtid_executed: String = mysql_async::prelude::Queryable::query_first(
+        // Detect database type by checking version
+        let version: String = mysql_async::prelude::Queryable::query_first(
             &mut conn,
-            "SELECT @@global.gtid_executed"
+            "SELECT VERSION()"
         ).await
-            .map_err(|e| format!("Failed to query GTID executed: {}", e))?
+            .map_err(|e| format!("Failed to query database version: {}", e))?
+            .unwrap_or_default();
+        
+        let is_mariadb = version.to_lowercase().contains("mariadb");
+        
+        // Use appropriate GTID variable based on database type
+        let gtid_query = if is_mariadb {
+            "SELECT @@global.gtid_current_pos"
+        } else {
+            "SELECT @@global.gtid_executed"
+        };
+        
+        let gtid_position: String = mysql_async::prelude::Queryable::query_first(
+            &mut conn,
+            gtid_query
+        ).await
+            .map_err(|e| format!("Failed to query GTID position: {}", e))?
             .unwrap_or_default();
             
-        Ok(gtid_executed)
+        Ok(gtid_position)
     }
     
     fn initialize_binlog_client(&mut self) -> PhpResult<()> {
