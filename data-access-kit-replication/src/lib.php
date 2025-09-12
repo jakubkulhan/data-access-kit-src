@@ -22,3 +22,37 @@ interface EventInterface {
     public string $schema { get; }
     public string $table { get; }
 }
+
+final readonly class InsertEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $after
+    ) {}
+}
+
+final readonly class UpdateEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $before,
+        public object $after
+    ) {}
+}
+
+final readonly class DeleteEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $before
+    ) {}
+}
