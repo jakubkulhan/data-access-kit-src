@@ -2,9 +2,11 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\StreamFilterInterface;
 
+#[Group("unit")]
 class StreamFilterInterfaceTest extends TestCase
 {
     public function testStreamFilterInterfaceExists(): void

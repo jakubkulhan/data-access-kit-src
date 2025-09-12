@@ -2,12 +2,14 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\Stream;
 use DataAccessKit\Replication\StreamCheckpointerInterface;
 use DataAccessKit\Replication\StreamFilterInterface;
 use Exception;
 
+#[Group("unit")]
 class StreamTest extends TestCase
 {
     public function testStreamClassExists(): void

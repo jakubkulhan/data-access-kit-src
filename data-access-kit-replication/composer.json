@@ -15,13 +15,19 @@
     },
     "scripts": {
         "build": "cargo build --release",
-        "test": [
+        "test:unit": [
             "@build",
-            "php -c php.ini vendor/bin/phpunit"
+            "php -c php.ini vendor/bin/phpunit --group unit"
         ],
-        "test-coverage": [
-            "@build", 
-            "php -c php.ini vendor/bin/phpunit --coverage-html coverage"
+        "test:database:env": [
+            "@build",
+            "php -c php.ini vendor/bin/phpunit --group database"
+        ],
+        "test:database:mysql": "DATABASE_URL=mysql://root@127.0.0.1:32016 composer run test:database:env",
+        "test:database:mariadb": "DATABASE_URL=mysql://root@127.0.0.1:35098 composer run test:database:env",
+        "test:database:all": [
+            "@test:database:mysql",
+            "@test:database:mariadb"
         ]
     }
 }

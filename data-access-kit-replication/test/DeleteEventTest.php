@@ -2,10 +2,12 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\{EventInterface, DeleteEvent};
 use Error;
 
+#[Group("unit")]
 class DeleteEventTest extends TestCase
 {
     public function testClassExists(): void

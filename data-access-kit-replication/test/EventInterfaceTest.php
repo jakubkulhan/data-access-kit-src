@@ -2,9 +2,11 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\EventInterface;
 
+#[Group("unit")]
 class EventInterfaceTest extends TestCase
 {
     public function testEventInterfaceExists(): void

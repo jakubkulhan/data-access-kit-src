@@ -2,9 +2,11 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\StreamCheckpointerInterface;
 
+#[Group("unit")]
 class StreamCheckpointerInterfaceTest extends TestCase
 {
     public function testStreamCheckpointerInterfaceExists(): void

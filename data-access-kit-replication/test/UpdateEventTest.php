@@ -2,10 +2,12 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\{EventInterface, UpdateEvent};
 use Error;
 
+#[Group("unit")]
 class UpdateEventTest extends TestCase
 {
     public function testClassExists(): void

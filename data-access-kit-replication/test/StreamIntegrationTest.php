@@ -2,6 +2,7 @@
 
 namespace DataAccessKit\Replication\Test;
 
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\Stream;
 use DataAccessKit\Replication\EventInterface;
@@ -10,6 +11,7 @@ use DataAccessKit\Replication\UpdateEvent;
 use DataAccessKit\Replication\DeleteEvent;
 use Exception;
 
+#[Group("database")]
 class StreamIntegrationTest extends TestCase
 {
     public function testCompleteStreamFlow(): void
@@ -17,24 +19,19 @@ class StreamIntegrationTest extends TestCase
         // Check for required DATABASE_URL environment variable
         $databaseUrl = $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL');
         if (!$databaseUrl) {
-            $this->fail('DATABASE_URL environment variable is required but not set. Example: mysql://user:password@host:3306/database');
+            $this->fail('DATABASE_URL environment variable is required but not set. Example: mysql://user:password@host:3306');
         }
         
         // Parse database URL to extract connection components
         $parsedUrl = parse_url($databaseUrl);
         if (!$parsedUrl) {
-            $this->fail('Invalid DATABASE_URL format. Expected: mysql://user:password@host:3306/database');
+            $this->fail('Invalid DATABASE_URL format. Expected: mysql://user:password@host:3306');
         }
         
         $host = $parsedUrl['host'] ?? 'localhost';
         $port = $parsedUrl['port'] ?? 3306;
         $user = $parsedUrl['user'] ?? 'root';
         $password = $parsedUrl['pass'] ?? '';
-        $database = ltrim($parsedUrl['path'] ?? '', '/');
-        
-        if (empty($database)) {
-            $this->fail('DATABASE_URL must include a database name in the path');
-        }
         
         $stream = null;
         
