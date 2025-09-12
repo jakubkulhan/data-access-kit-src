@@ -430,66 +430,109 @@ foreach ($stream as $event) {
 
 Since ext-php-rs doesn't support creating PHP interfaces directly from Rust, the interfaces must be declared by executing PHP code during extension startup. The extension embeds interface definitions at compile time using `include_str!()` to ensure no external file dependencies.
 
+**Current Implementation:** The extension loads interfaces from `src/lib.php` using a request startup function with `Once` synchronization to ensure interfaces are loaded only once per process:
+
 ```rust
-use ext_php_rs::prelude::*;
-
-#[php_startup]
-pub fn startup() {
-    if let Err(e) = load_extension_interfaces() {
-        eprintln!("Failed to load extension interfaces: {}", e);
-    }
-}
-
-fn load_extension_interfaces() -> PhpResult<()> {
-    let embedded_interfaces = include_str!("../interfaces/replication.php");
-    execute_php_code(embedded_interfaces)?;
-    Ok(())
-}
-
-fn execute_php_code(code: &str) -> PhpResult<()> {
-    unsafe {
-        let code_cstring = std::ffi::CString::new(code)?;
-        let result = ext_php_rs::sys::zend_eval_string(
-            code_cstring.as_ptr() as *mut i8,
-            std::ptr::null_mut(),
-            b"replication_interfaces.php\0".as_ptr() as *const i8,
+unsafe extern "C" fn request_startup_function(_type: i32, _module_number: i32) -> i32 {
+    // Use Once to ensure interfaces are only loaded once per process
+    INTERFACES_INIT.call_once(|| {
+        let interface_code = include_str!("lib.php");
+        
+        // Prepend ?> to properly handle the <?php opening tag when eval'ing
+        let eval_code = format!("?>{}", interface_code);
+        
+        let code_cstr = match std::ffi::CString::new(eval_code) {
+            Ok(cstr) => cstr,
+            Err(_) => {
+                eprintln!("Failed to create CString from interface code");
+                return;
+            }
+        };
+        
+        let filename_cstr = match std::ffi::CString::new("lib.php") {
+            Ok(cstr) => cstr,
+            Err(_) => {
+                eprintln!("Failed to create filename CString");
+                return;
+            }
+        };
+        
+        // Use the FFI to call zend_eval_string when PHP is ready
+        let result = ffi::zend_eval_string(
+            code_cstr.as_ptr(),
+            std::ptr::null_mut(), // No return value needed
+            filename_cstr.as_ptr(),
         );
         
-        if result == ext_php_rs::sys::FAILURE {
-            return Err("Failed to execute PHP interface code".into());
+        // Check if evaluation was successful
+        if result != 0 {
+            eprintln!("Failed to evaluate interface code during request startup");
         }
-    }
+    });
     
-    Ok(())
+    0 // SUCCESS
 }
 ```
 
-**Interface Definition File** (`interfaces/replication.php`):
+**Interface Definition File** (`src/lib.php`):
 ```php
 <?php
-// interfaces/replication.php
 
-namespace DataAccessKit\Replication {
-    interface StreamCheckpointerInterface {
-        public function loadLastCheckpoint(): ?string;
-        public function saveCheckpoint(string $checkpoint): void;
-    }
+namespace DataAccessKit\Replication;
+
+interface StreamCheckpointerInterface {
+    public function loadLastCheckpoint(): ?string;
+    public function saveCheckpoint(string $checkpoint): void;
+}
+
+interface StreamFilterInterface {
+    public function accept(string $type, string $schema, string $table): bool;
+}
+
+interface EventInterface {
+    public const string INSERT = 'INSERT';
+    public const string UPDATE = 'UPDATE';
+    public const string DELETE = 'DELETE';
     
-    interface StreamFilterInterface {
-        public function accept(string $type, string $schema, string $table): bool;
-    }
-    
-    interface EventInterface {
-        public const string INSERT = 'INSERT';
-        public const string UPDATE = 'UPDATE';
-        public const string DELETE = 'DELETE';
-        
-        public string $type { get; }
-        public int $timestamp { get; }
-        public string $checkpoint { get; }
-        public string $schema { get; }
-        public string $table { get; }
-    }
+    public string $type { get; }
+    public int $timestamp { get; }
+    public string $checkpoint { get; }
+    public string $schema { get; }
+    public string $table { get; }
+}
+
+final readonly class InsertEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $after
+    ) {}
+}
+
+final readonly class UpdateEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $before,
+        public object $after
+    ) {}
+}
+
+final readonly class DeleteEvent implements EventInterface {
+    public function __construct(
+        public string $type,
+        public int $timestamp,
+        public string $checkpoint,
+        public string $schema,
+        public string $table,
+        public object $before
+    ) {}
 }
 ```
 
@@ -509,54 +552,35 @@ log = "0.4"
 
 ### Key Rust Structures
 
+**Current Implementation:** The Stream class is implemented in Rust with a driver-based architecture, while Event classes are implemented in PHP:
+
 ```rust
 use ext_php_rs::prelude::*;
 
-#[php_class(name = "DataAccessKit\\Replication\\Stream")]
-#[php(implements = "Iterator")]
+#[php_class]
+#[php(name = "DataAccessKit\\\\Replication\\\\Stream")]
+#[php(implements(ce = ce::iterator, stub = "Iterator"))]
+#[derive(Debug)]
 pub struct Stream {
-    connection_url: String,
-    connection: Option<BinlogConnection>,
-    checkpointer: Option<ZendObject>,
-    filter: Option<ZendObject>,
-    current_event: Option<ReplicationEvent>,
+    driver: Box<dyn StreamDriver>,
     position: u64,
 }
 
-#[php_class(name = "DataAccessKit\\Replication\\InsertEvent")]
-#[php(implements = "DataAccessKit\\Replication\\EventInterface")]
-pub struct InsertEvent {
-    pub event_type: String,
-    pub timestamp: u64,
-    pub checkpoint: String,
-    pub schema: String,
-    pub table: String,
-    pub after: ZendObject, // object with column name => value properties
-}
-
-#[php_class(name = "DataAccessKit\\Replication\\UpdateEvent")]
-#[php(implements = "DataAccessKit\\Replication\\EventInterface")]
-pub struct UpdateEvent {
-    pub event_type: String,
-    pub timestamp: u64,
-    pub checkpoint: String,
-    pub schema: String,
-    pub table: String,
-    pub before: ZendObject, // object with column name => value properties
-    pub after: ZendObject,  // object with column name => value properties
-}
-
-#[php_class(name = "DataAccessKit\\Replication\\DeleteEvent")]
-#[php(implements = "DataAccessKit\\Replication\\EventInterface")]
-pub struct DeleteEvent {
-    pub event_type: String,
-    pub timestamp: u64,
-    pub checkpoint: String,
-    pub schema: String,
-    pub table: String,
-    pub before: ZendObject, // object with column name => value properties
+// StreamDriver trait for database-specific implementations
+trait StreamDriver: std::fmt::Debug {
+    fn connect(&mut self) -> PhpResult<()>;
+    fn disconnect(&mut self) -> PhpResult<()>;
+    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()>;
+    fn set_filter(&mut self, filter: &Zval) -> PhpResult<()>;
+    fn current(&self) -> PhpResult<Option<Zval>>;
+    fn key(&self) -> PhpResult<i32>;
+    fn next(&mut self) -> PhpResult<()>;
+    fn rewind(&mut self) -> PhpResult<()>;
+    fn valid(&self) -> PhpResult<bool>;
 }
 ```
+
+**Event Classes:** Event classes are implemented as PHP readonly classes (defined in `src/lib.php`) rather than Rust structs, providing better PHP integration and simpler property access using PHP 8.4's readonly class features.
 
 ### Threading and Async Handling
 
@@ -748,17 +772,19 @@ class EventInterfaceTest extends TestCase
 ```
 data-access-kit-replication/
 ├── src/
-│   └── lib.rs
-├── interfaces/
-│   └── replication.php    # Interface definitions
+│   ├── lib.rs             # Main Rust implementation
+│   ├── lib.php            # Interface and event class definitions
+│   └── mysql.rs           # MySQL driver implementation
 ├── test/                  # PHPUnit test directory
 │   ├── bootstrap.php
 │   ├── EventInterfaceTest.php
 │   ├── StreamCheckpointerInterfaceTest.php
-│   └── StreamFilterInterfaceTest.php
+│   ├── StreamFilterInterfaceTest.php
+│   └── StreamTest.php     # Stream class tests
 ├── Cargo.toml
 ├── composer.json          # PHPUnit dependency
 ├── php.ini                # Local PHP configuration
+├── CLAUDE.md              # Development instructions
 └── SPEC.md
 ```
 
