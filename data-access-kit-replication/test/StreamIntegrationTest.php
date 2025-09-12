@@ -19,6 +19,7 @@ class StreamIntegrationTest extends TestCase
     private ?string $originalBinlogRowMetadata = null;
     private ?\PDO $pdo = null;
     private ?array $dbConfig = null;
+    private ?array $replicationConfig = null;
 
     protected function setUp(): void
     {
@@ -34,6 +35,21 @@ class StreamIntegrationTest extends TestCase
             'user' => $parsedUrl['user'] ?? 'root',
             'password' => $parsedUrl['pass'] ?? '',
         ];
+        
+        // Get replication database URL for binlog streaming
+        $replicationUrl = $_ENV['REPLICATION_DATABASE_URL'] ?? getenv('REPLICATION_DATABASE_URL');
+        if ($replicationUrl) {
+            $replicationParsedUrl = parse_url($replicationUrl);
+            $this->replicationConfig = [
+                'host' => $replicationParsedUrl['host'] ?? $this->dbConfig['host'],
+                'port' => $replicationParsedUrl['port'] ?? $this->dbConfig['port'],
+                'user' => $replicationParsedUrl['user'] ?? 'replication_test',
+                'password' => $replicationParsedUrl['pass'] ?? 'replication_test',
+            ];
+        } else {
+            // Fall back to using same credentials as main database
+            $this->replicationConfig = $this->dbConfig;
+        }
         
         try {
             $this->pdo = new \PDO(
@@ -108,15 +124,63 @@ class StreamIntegrationTest extends TestCase
         $queryParams = array_merge(['server_id' => '100'], $params);
         $queryString = http_build_query($queryParams);
         
-        return sprintf(
-            'mysql://%s:%s@%s:%d%s?%s',
-            $this->dbConfig['user'],
-            $this->dbConfig['password'],
-            $this->dbConfig['host'],
-            $this->dbConfig['port'],
-            $database,
-            $queryString
-        );
+        // Build URL based on whether password is provided
+        if (!empty($this->dbConfig['password'])) {
+            return sprintf(
+                'mysql://%s:%s@%s:%d%s?%s',
+                $this->dbConfig['user'],
+                $this->dbConfig['password'],
+                $this->dbConfig['host'],
+                $this->dbConfig['port'],
+                $database,
+                $queryString
+            );
+        } else {
+            return sprintf(
+                'mysql://%s@%s:%d%s?%s',
+                $this->dbConfig['user'],
+                $this->dbConfig['host'],
+                $this->dbConfig['port'],
+                $database,
+                $queryString
+            );
+        }
+    }
+    
+    private function createReplicationConnectionUrl(array $params = []): string
+    {
+        if ($this->replicationConfig === null) {
+            throw new \Exception('Replication configuration not available');
+        }
+        
+        // Extract database from params if provided
+        $database = isset($params['database']) ? '/' . $params['database'] : '';
+        unset($params['database']); // Remove from query params
+        
+        $queryParams = array_merge(['server_id' => '100'], $params);
+        $queryString = http_build_query($queryParams);
+        
+        // Build URL based on whether password is provided
+        if (!empty($this->replicationConfig['password'])) {
+            return sprintf(
+                'mysql://%s:%s@%s:%d%s?%s',
+                $this->replicationConfig['user'],
+                $this->replicationConfig['password'],
+                $this->replicationConfig['host'],
+                $this->replicationConfig['port'],
+                $database,
+                $queryString
+            );
+        } else {
+            return sprintf(
+                'mysql://%s@%s:%d%s?%s',
+                $this->replicationConfig['user'],
+                $this->replicationConfig['host'],
+                $this->replicationConfig['port'],
+                $database,
+                $queryString
+            );
+        }
     }
     public function testCompleteStreamFlow(): void
     {
@@ -146,8 +210,8 @@ class StreamIntegrationTest extends TestCase
                 )
             ");
             
-            // Create stream with MySQL connection using test database
-            $stream = new Stream($this->createConnectionUrl(['database' => 'test_replication_db']));
+            // Create stream with replication user connection for binlog streaming
+            $stream = new Stream($this->createReplicationConnectionUrl(['database' => 'test_replication_db']));
             $this->assertInstanceOf(Stream::class, $stream);
             
             // Test 1: Connect to database
@@ -282,7 +346,7 @@ class StreamIntegrationTest extends TestCase
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
         $stmt->execute(['STATEMENT']);
         
-        $stream = new Stream($this->createConnectionUrl());
+        $stream = new Stream($this->createReplicationConnectionUrl());
         
         $this->expectException(Exception::class);
         $this->expectExceptionMessageMatches('/binlog_format must be ROW/i');
@@ -299,7 +363,7 @@ class StreamIntegrationTest extends TestCase
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
         $stmt->execute(['MINIMAL']);
         
-        $stream = new Stream($this->createConnectionUrl());
+        $stream = new Stream($this->createReplicationConnectionUrl());
         
         $this->expectException(Exception::class);
         $this->expectExceptionMessageMatches('/binlog_row_image must be FULL/i');
@@ -316,7 +380,7 @@ class StreamIntegrationTest extends TestCase
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
         $stmt->execute(['MINIMAL']);
         
-        $stream = new Stream($this->createConnectionUrl());
+        $stream = new Stream($this->createReplicationConnectionUrl());
         
         $this->expectException(Exception::class);
         $this->expectExceptionMessageMatches('/binlog_row_metadata must be FULL/i');

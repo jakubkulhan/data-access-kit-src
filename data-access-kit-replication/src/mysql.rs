@@ -3,7 +3,17 @@ use ext_php_rs::types::Zval;
 use ext_php_rs::zend;
 use crate::StreamDriver;
 use mysql_async::{Pool, OptsBuilder};
-use mysql_binlog_connector_rust::binlog_client::BinlogClient;
+use mysql_binlog_connector_rust::{
+    binlog_client::BinlogClient,
+    binlog_stream::BinlogStream,
+    event::{
+        event_data::EventData, 
+        event_header::EventHeader,
+        table_map_event::TableMapEvent,
+        row_event::RowEvent,
+    },
+    column::column_value::ColumnValue,
+};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::LazyLock;
 
@@ -25,10 +35,12 @@ pub struct MySQLStreamDriver {
     position: u64,
     pool: Option<Pool>,
     binlog_client: Option<BinlogClient>,
+    binlog_stream: Option<BinlogStream>,
     current_gtid: Option<String>,
-    current_event: Option<String>,
+    current_event: Option<Zval>,
     event_iterator_started: bool,
     connected: bool,
+    table_map: std::collections::HashMap<u64, TableMapEvent>,
 }
 
 impl std::fmt::Debug for MySQLStreamDriver {
@@ -64,10 +76,12 @@ impl MySQLStreamDriver {
             position: 0,
             pool: None,
             binlog_client: None,
+            binlog_stream: None,
             current_gtid: None,
             current_event: None,
             event_iterator_started: false,
             connected: false,
+            table_map: std::collections::HashMap::new(),
         }
     }
 
@@ -148,13 +162,13 @@ impl MySQLStreamDriver {
         Ok(gtid_position)
     }
     
-    fn initialize_binlog_client(&mut self) -> PhpResult<()> {
+    async fn initialize_binlog_client(&mut self) -> PhpResult<()> {
         let connection_url = format!("mysql://{}:{}@{}:{}",
             self.user, self.password, self.host, self.port);
             
         let gtid_set = self.current_gtid.clone().unwrap_or_default();
         
-        let binlog_client = BinlogClient {
+        let mut binlog_client = BinlogClient {
             url: connection_url,
             binlog_filename: "".to_string(),
             binlog_position: 4,
@@ -167,83 +181,195 @@ impl MySQLStreamDriver {
             timeout_secs: 60,
         };
         
+        // Connect to binlog stream
+        let binlog_stream = binlog_client.connect().await
+            .map_err(|e| PhpException::default(format!("Failed to connect to binlog: {}", e).into()))?;
+            
+        self.binlog_stream = Some(binlog_stream);
         self.binlog_client = Some(binlog_client);
         Ok(())
     }
     
     fn fetch_next_event(&mut self) -> PhpResult<()> {
-        // For now, simulate having events to make integration tests pass
-        // In a real implementation, this would read from the actual binlog stream
-        if self.position < 3 {
-            // Simulate we have 3 events (INSERT, UPDATE, DELETE)
-            self.current_event = Some(format!("simulated_event_{}", self.position));
-        } else {
-            self.current_event = None;
-        }
-        Ok(())
+        // Create a runtime for async operations
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
+
+        rt.block_on(async {
+            if let Some(ref mut stream) = self.binlog_stream {
+                loop {
+                    // Read next event from binlog stream
+                    let (header, data) = stream.read().await
+                        .map_err(|e| PhpException::default(format!("Failed to read binlog event: {}", e).into()))?;
+
+                    match data {
+                        // Handle table map events to maintain column metadata
+                        EventData::TableMap(table_map_event) => {
+                            self.table_map.insert(table_map_event.table_id, table_map_event.clone());
+                            // Continue to next event, don't return table map events to PHP
+                            continue;
+                        },
+                        
+                        // Handle row events that we want to convert to PHP events
+                        EventData::WriteRows(write_rows_event) => {
+                            if let Some(table_map) = self.table_map.get(&write_rows_event.table_id) {
+                                // Convert to InsertEvent  
+                                for row in &write_rows_event.rows {
+                                    match self.create_insert_event_from_binlog(
+                                        &header, 
+                                        table_map, 
+                                        row
+                                    ) {
+                                        Ok(event_obj) => {
+                                            self.current_event = Some(event_obj);
+                                            return Ok(());
+                                        }
+                                        Err(e) => {
+                                            // Log the error but continue - maybe the class loading will work later
+                                            eprintln!("Failed to create InsertEvent: {:?}", e);
+                                            self.current_event = None;
+                                            return Ok(());
+                                        }
+                                    }
+                                }
+                            }
+                            // Skip if no table map found
+                            continue;
+                        },
+                        
+                        EventData::UpdateRows(update_rows_event) => {
+                            if let Some(table_map) = self.table_map.get(&update_rows_event.table_id) {
+                                // Convert to UpdateEvent
+                                for (before_row, after_row) in &update_rows_event.rows {
+                                    let event_obj = self.create_update_event_from_binlog(
+                                        &header,
+                                        table_map,
+                                        before_row,
+                                        after_row
+                                    )?;
+                                    self.current_event = Some(event_obj);
+                                    return Ok(());
+                                }
+                            }
+                            // Skip if no table map found
+                            continue;
+                        },
+                        
+                        EventData::DeleteRows(delete_rows_event) => {
+                            if let Some(table_map) = self.table_map.get(&delete_rows_event.table_id) {
+                                // Convert to DeleteEvent
+                                for row in &delete_rows_event.rows {
+                                    let event_obj = self.create_delete_event_from_binlog(
+                                        &header,
+                                        table_map,
+                                        row
+                                    )?;
+                                    self.current_event = Some(event_obj);
+                                    return Ok(());
+                                }
+                            }
+                            // Skip if no table map found
+                            continue;
+                        },
+                        
+                        // Skip all other event types
+                        _ => {
+                            continue;
+                        }
+                    }
+                }
+            } else {
+                // No binlog stream available, set current_event to None
+                self.current_event = None;
+                Ok(())
+            }
+        })
     }
     
-    fn create_mock_event_object(&self, event_type: &str) -> PhpResult<Option<Zval>> {
-        let current_timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs() as i32;
-            
-        let checkpoint = format!("checkpoint_{}", self.position);
+    fn create_insert_event_from_binlog(
+        &self,
+        header: &EventHeader,
+        table_map: &TableMapEvent,
+        row: &RowEvent
+    ) -> PhpResult<Zval> {
+        let timestamp = header.timestamp as i64;
+        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
         
-        match event_type {
-            "simulated_event_0" => {
-                // Create INSERT event
-                self.create_event(
-                    "DataAccessKit\\Replication\\InsertEvent",
-                    "INSERT",
-                    current_timestamp,
-                    &checkpoint,
-                    "test_replication_db",
-                    "test_users",
-                    None, // no before data for INSERT
-                    Some(&[("name", "John Doe"), ("email", "john@example.com")]) // after data
-                )
-            },
-            "simulated_event_1" => {
-                // Create UPDATE event
-                self.create_event(
-                    "DataAccessKit\\Replication\\UpdateEvent",
-                    "UPDATE",
-                    current_timestamp,
-                    &checkpoint,
-                    "test_replication_db", 
-                    "test_users",
-                    Some(&[("name", "John Doe"), ("email", "john@example.com")]), // before
-                    Some(&[("name", "John Smith"), ("email", "johnsmith@example.com")]) // after
-                )
-            },
-            "simulated_event_2" => {
-                // Create DELETE event
-                self.create_event(
-                    "DataAccessKit\\Replication\\DeleteEvent",
-                    "DELETE",
-                    current_timestamp,
-                    &checkpoint,
-                    "test_replication_db",
-                    "test_users",
-                    Some(&[("name", "John Smith"), ("email", "johnsmith@example.com")]), // before
-                    None // no after data for DELETE
-                )
-            },
-            _ => Ok(None)
-        }
+        let after_data = self.create_data_object_from_row(table_map, row)?;
+        
+        self.create_event(
+            "DataAccessKit\\Replication\\InsertEvent",
+            "INSERT",
+            timestamp as i32,
+            &checkpoint,
+            &table_map.database_name,
+            &table_map.table_name,
+            None,
+            Some(after_data)
+        ).map(|opt| opt.unwrap())
     }
     
-    fn create_data_object(&self, data: &[(&str, &str)]) -> PhpResult<Zval> {
+    fn create_update_event_from_binlog(
+        &self,
+        header: &EventHeader,
+        table_map: &TableMapEvent,
+        before_row: &RowEvent,
+        after_row: &RowEvent
+    ) -> PhpResult<Zval> {
+        let timestamp = header.timestamp as i64;
+        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
+        
+        let before_data = self.create_data_object_from_row(table_map, before_row)?;
+        let after_data = self.create_data_object_from_row(table_map, after_row)?;
+        
+        self.create_event(
+            "DataAccessKit\\Replication\\UpdateEvent",
+            "UPDATE", 
+            timestamp as i32,
+            &checkpoint,
+            &table_map.database_name,
+            &table_map.table_name,
+            Some(before_data),
+            Some(after_data)
+        ).map(|opt| opt.unwrap())
+    }
+    
+    fn create_delete_event_from_binlog(
+        &self,
+        header: &EventHeader,
+        table_map: &TableMapEvent,
+        row: &RowEvent
+    ) -> PhpResult<Zval> {
+        let timestamp = header.timestamp as i64;
+        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
+        
+        let before_data = self.create_data_object_from_row(table_map, row)?;
+        
+        self.create_event(
+            "DataAccessKit\\Replication\\DeleteEvent",
+            "DELETE",
+            timestamp as i32,
+            &checkpoint,
+            &table_map.database_name,
+            &table_map.table_name,
+            Some(before_data),
+            None
+        ).map(|opt| opt.unwrap())
+    }
+    
+    fn create_data_object_from_row(&self, _table_map: &TableMapEvent, row: &RowEvent) -> PhpResult<Zval> {
         use std::collections::HashMap;
         
-        // Create a PHP stdClass object using an array that will be cast to object
+        // Create a PHP stdClass object using column names from table map
         let mut map = HashMap::new();
-        for (key, value) in data {
-            let mut value_zval = Zval::new();
-            value_zval.set_string(value, false)?;
-            map.insert(key.to_string(), value_zval);
+        
+        // Since we don't have column names in the table map event from this crate,
+        // we'll use column indices as keys for now. In a full implementation,
+        // you'd need to query the database schema to get column names.
+        for (i, column_value) in row.column_values.iter().enumerate() {
+            let key = format!("col_{}", i); // Use column index as key
+            let php_value = self.convert_column_value_to_php(column_value)?;
+            map.insert(key, php_value);
         }
         
         let mut obj_zval = Zval::new();
@@ -254,10 +380,9 @@ impl MySQLStreamDriver {
             .ok_or_else(|| PhpException::default("stdClass not found".into()))?;
         
         let mut obj = ext_php_rs::types::ZendObject::new(stdclass_ce);
-        for (key, value) in data {
-            let prop_name = key.to_string();
-            let mut prop_zval = Zval::new();
-            prop_zval.set_string(value, false)?;
+        for (i, column_value) in row.column_values.iter().enumerate() {
+            let prop_name = format!("col_{}", i);
+            let prop_zval = self.convert_column_value_to_php(column_value)?;
             obj.set_property(&prop_name, prop_zval)?;
         }
         
@@ -265,6 +390,71 @@ impl MySQLStreamDriver {
         result.set_object(&mut *obj.into_raw());
         Ok(result)
     }
+    
+    fn convert_column_value_to_php(&self, column_value: &ColumnValue) -> PhpResult<Zval> {
+        let mut zval = Zval::new();
+        
+        match column_value {
+            ColumnValue::None => {
+                zval.set_null();
+            },
+            ColumnValue::Tiny(i) => zval.set_long(*i as i64),
+            ColumnValue::Short(i) => zval.set_long(*i as i64),
+            ColumnValue::Long(i) => zval.set_long(*i as i64),
+            ColumnValue::LongLong(i) => zval.set_long(*i),
+            ColumnValue::Float(f) => zval.set_double(*f as f64),
+            ColumnValue::Double(d) => zval.set_double(*d),
+            ColumnValue::Decimal(d) => zval.set_string(d, false)?,
+            ColumnValue::Date(date) => zval.set_string(date, false)?,
+            ColumnValue::DateTime(dt) => zval.set_string(dt, false)?,
+            ColumnValue::Time(t) => zval.set_string(t, false)?,
+            ColumnValue::Timestamp(ts) => zval.set_long(*ts),
+            ColumnValue::Year(y) => zval.set_long(*y as i64),
+            ColumnValue::String(bytes) => {
+                // Convert Vec<u8> to string, assuming UTF-8
+                if let Ok(s) = String::from_utf8(bytes.clone()) {
+                    zval.set_string(&s, false)?;
+                } else {
+                    // Fall back to base64 encoding for non-UTF-8 data
+                    use base64::Engine;
+                    let engine = base64::engine::general_purpose::STANDARD;
+                    let encoded = engine.encode(bytes);
+                    zval.set_string(&encoded, false)?;
+                }
+            },
+            ColumnValue::Blob(bytes) => {
+                // Encode binary data as base64
+                use base64::Engine;
+                let engine = base64::engine::general_purpose::STANDARD;
+                let encoded = engine.encode(bytes);
+                zval.set_string(&encoded, false)?;
+            },
+            ColumnValue::Json(bytes) => {
+                // Try to parse as JSON string
+                if let Ok(json_str) = mysql_binlog_connector_rust::column::json::json_binary::JsonBinary::parse_as_string(bytes) {
+                    zval.set_string(&json_str, false)?;
+                } else {
+                    // Fall back to base64 encoding
+                    use base64::Engine;
+                    let engine = base64::engine::general_purpose::STANDARD;
+                    let encoded = engine.encode(bytes);
+                    zval.set_string(&encoded, false)?;
+                }
+            },
+            ColumnValue::Bit(value) => {
+                zval.set_long(*value as i64);
+            },
+            ColumnValue::Set(value) => {
+                zval.set_long(*value as i64);
+            },
+            ColumnValue::Enum(value) => {
+                zval.set_long(*value as i64);
+            }
+        }
+        
+        Ok(zval)
+    }
+    
     
     fn create_event(
         &self, 
@@ -274,8 +464,8 @@ impl MySQLStreamDriver {
         checkpoint: &str, 
         schema: &str, 
         table: &str, 
-        before_data: Option<&[(&str, &str)]>, 
-        after_data: Option<&[(&str, &str)]>
+        before_data: Option<Zval>, 
+        after_data: Option<Zval>
     ) -> PhpResult<Option<Zval>> {
         // Find the event class
         let ce = zend::ClassEntry::try_find(class_name)
@@ -294,25 +484,11 @@ impl MySQLStreamDriver {
             &table,
         ];
         
-        // Add before object if provided
-        let before_obj = if let Some(data) = before_data {
-            Some(self.create_data_object(data)?)
-        } else {
-            None
-        };
-        
-        // Add after object if provided  
-        let after_obj = if let Some(data) = after_data {
-            Some(self.create_data_object(data)?)
-        } else {
-            None
-        };
-        
         // Add objects to params in the correct order
-        if let Some(ref before) = before_obj {
+        if let Some(ref before) = before_data {
             params.push(before);
         }
-        if let Some(ref after) = after_obj {
+        if let Some(ref after) = after_data {
             params.push(after);
         }
         
@@ -338,15 +514,13 @@ impl StreamDriver for MySQLStreamDriver {
 
         rt.block_on(async {
             // Build MySQL connection options
-            let mut opts = OptsBuilder::default()
+            // For replication, we don't connect to a specific database
+            // The replication user needs REPLICATION SLAVE/CLIENT privileges, not database access
+            let opts = OptsBuilder::default()
                 .ip_or_hostname(&self.host)
                 .tcp_port(self.port)
                 .user(Some(&self.user))
                 .pass(Some(&self.password));
-            
-            if let Some(ref db) = self.database {
-                opts = opts.db_name(Some(db));
-            }
 
             // Create connection pool
             let pool = Pool::new(opts);
@@ -374,10 +548,12 @@ impl StreamDriver for MySQLStreamDriver {
 
         self.pool = None;
         self.binlog_client = None;
+        self.binlog_stream = None;
         self.current_gtid = None;
         self.current_event = None;
         self.event_iterator_started = false;
         self.connected = false;
+        self.table_map.clear();
         
         Ok(())
     }
@@ -395,8 +571,15 @@ impl StreamDriver for MySQLStreamDriver {
             return Ok(None);
         }
         
+        // Return the current event if available
         if let Some(ref event) = self.current_event {
-            self.create_mock_event_object(event)
+            // Create a new Zval and copy the content
+            let mut result = Zval::new();
+            unsafe {
+                // Copy the zval content - this is a shallow copy
+                std::ptr::copy_nonoverlapping(event, &mut result, 1);
+            }
+            Ok(Some(result))
         } else {
             Ok(None)
         }
@@ -422,8 +605,13 @@ impl StreamDriver for MySQLStreamDriver {
             self.connect()?;
         }
         
-        // Initialize binlog client with current GTID
-        self.initialize_binlog_client()?;
+        // Initialize binlog client with current GTID (async)
+        let rt = tokio::runtime::Runtime::new()
+            .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
+        
+        rt.block_on(async {
+            self.initialize_binlog_client().await
+        })?;
         
         self.position = 0;
         self.event_iterator_started = true;
