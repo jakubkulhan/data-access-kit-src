@@ -8,6 +8,24 @@ services:
       - 32016:3306
     tmpfs:
       - /var/lib/mysql
+    command: [
+      "--log-bin=mysql-bin",
+      "--server-id=1",
+      "--binlog-format=ROW",
+      "--binlog-row-image=FULL",
+      "--binlog-row-metadata=FULL",
+      "--gtid-mode=ON",
+      "--enforce-gtid-consistency=ON"
+    ]
+    volumes:
+      - type: tmpfs
+        target: /docker-entrypoint-initdb.d
+        tmpfs:
+          size: 1M
+      - type: bind
+        source: ./.docker/replication-init.sql
+        target: /docker-entrypoint-initdb.d/01-replication-user.sql
+        read_only: true
     healthcheck:
       test: ["CMD", "mysqladmin", "ping"]
       interval: 1s
@@ -23,6 +41,23 @@ services:
       - 35098:3306
     tmpfs:
       - /var/lib/mysql
+    command: [
+      "--log-bin=mariadb-bin",
+      "--server-id=2", 
+      "--binlog-format=ROW",
+      "--binlog-row-image=FULL",
+      "--binlog-row-metadata=FULL",
+      "--gtid-strict-mode=ON"
+    ]
+    volumes:
+      - type: tmpfs
+        target: /docker-entrypoint-initdb.d
+        tmpfs:
+          size: 1M
+      - type: bind
+        source: ./.docker/replication-init.sql
+        target: /docker-entrypoint-initdb.d/01-replication-user.sql
+        read_only: true
     healthcheck:
       test: ["CMD", "mariadb-admin", "ping"]
       interval: 1s
