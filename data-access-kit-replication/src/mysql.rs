@@ -1,5 +1,6 @@
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
+use ext_php_rs::zend;
 use crate::StreamDriver;
 use mysql_async::{Pool, OptsBuilder};
 use mysql_binlog_connector_rust::binlog_client::BinlogClient;
@@ -167,18 +168,144 @@ impl MySQLStreamDriver {
     }
     
     fn create_mock_event_object(&self, event_type: &str) -> PhpResult<Option<Zval>> {
-        // For now, return a simple string representation of the event
-        // In a real implementation, this would create proper event objects
-        // This is a placeholder until we can properly integrate object creation from Rust
-        let event_description = match event_type {
-            "simulated_event_0" => "INSERT event for test_replication_db.test_users",
-            "simulated_event_1" => "UPDATE event for test_replication_db.test_users", 
-            "simulated_event_2" => "DELETE event for test_replication_db.test_users",
-            _ => return Ok(None)
+        let current_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i32;
+            
+        let checkpoint = format!("checkpoint_{}", self.position);
+        
+        match event_type {
+            "simulated_event_0" => {
+                // Create INSERT event
+                self.create_event(
+                    "DataAccessKit\\Replication\\InsertEvent",
+                    "INSERT",
+                    current_timestamp,
+                    &checkpoint,
+                    "test_replication_db",
+                    "test_users",
+                    None, // no before data for INSERT
+                    Some(&[("name", "John Doe"), ("email", "john@example.com")]) // after data
+                )
+            },
+            "simulated_event_1" => {
+                // Create UPDATE event
+                self.create_event(
+                    "DataAccessKit\\Replication\\UpdateEvent",
+                    "UPDATE",
+                    current_timestamp,
+                    &checkpoint,
+                    "test_replication_db", 
+                    "test_users",
+                    Some(&[("name", "John Doe"), ("email", "john@example.com")]), // before
+                    Some(&[("name", "John Smith"), ("email", "johnsmith@example.com")]) // after
+                )
+            },
+            "simulated_event_2" => {
+                // Create DELETE event
+                self.create_event(
+                    "DataAccessKit\\Replication\\DeleteEvent",
+                    "DELETE",
+                    current_timestamp,
+                    &checkpoint,
+                    "test_replication_db",
+                    "test_users",
+                    Some(&[("name", "John Smith"), ("email", "johnsmith@example.com")]), // before
+                    None // no after data for DELETE
+                )
+            },
+            _ => Ok(None)
+        }
+    }
+    
+    fn create_data_object(&self, data: &[(&str, &str)]) -> PhpResult<Zval> {
+        use std::collections::HashMap;
+        
+        // Create a PHP stdClass object using an array that will be cast to object
+        let mut map = HashMap::new();
+        for (key, value) in data {
+            let mut value_zval = Zval::new();
+            value_zval.set_string(value, false)?;
+            map.insert(key.to_string(), value_zval);
+        }
+        
+        let mut obj_zval = Zval::new();
+        obj_zval.set_array(map)?;
+        
+        // Convert to stdClass object
+        let stdclass_ce = zend::ClassEntry::try_find("stdClass")
+            .ok_or_else(|| PhpException::default("stdClass not found".into()))?;
+        
+        let mut obj = ext_php_rs::types::ZendObject::new(stdclass_ce);
+        for (key, value) in data {
+            let prop_name = key.to_string();
+            let mut prop_zval = Zval::new();
+            prop_zval.set_string(value, false)?;
+            obj.set_property(&prop_name, prop_zval)?;
+        }
+        
+        let mut result = Zval::new();
+        result.set_object(&mut *obj.into_raw());
+        Ok(result)
+    }
+    
+    fn create_event(
+        &self, 
+        class_name: &str, 
+        event_type: &str, 
+        timestamp: i32, 
+        checkpoint: &str, 
+        schema: &str, 
+        table: &str, 
+        before_data: Option<&[(&str, &str)]>, 
+        after_data: Option<&[(&str, &str)]>
+    ) -> PhpResult<Option<Zval>> {
+        // Find the event class
+        let ce = zend::ClassEntry::try_find(class_name)
+            .ok_or_else(|| PhpException::default(format!("Class {} not found", class_name).into()))?;
+        
+        // Create new object instance
+        let obj = ext_php_rs::types::ZendObject::new(ce);
+        
+        // Prepare constructor parameters
+        let timestamp_i64 = timestamp as i64;
+        let mut params: Vec<&dyn ext_php_rs::convert::IntoZvalDyn> = vec![
+            &event_type,
+            &timestamp_i64,
+            &checkpoint,
+            &schema,
+            &table,
+        ];
+        
+        // Add before object if provided
+        let before_obj = if let Some(data) = before_data {
+            Some(self.create_data_object(data)?)
+        } else {
+            None
         };
         
+        // Add after object if provided  
+        let after_obj = if let Some(data) = after_data {
+            Some(self.create_data_object(data)?)
+        } else {
+            None
+        };
+        
+        // Add objects to params in the correct order
+        if let Some(ref before) = before_obj {
+            params.push(before);
+        }
+        if let Some(ref after) = after_obj {
+            params.push(after);
+        }
+        
+        // Call constructor
+        let _result = obj.try_call_method("__construct", params)?;
+        
+        // Convert object to Zval
         let mut event_zval = Zval::new();
-        event_zval.set_string(event_description, false)?;
+        event_zval.set_object(&mut *obj.into_raw());
         Ok(Some(event_zval))
     }
 }

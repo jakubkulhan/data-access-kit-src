@@ -1,3 +1,4 @@
+ext-php-rs/
 target/
 vendor/
 .phpunit.result.cache
