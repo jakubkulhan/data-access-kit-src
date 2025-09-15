@@ -17,6 +17,7 @@ use mysql_binlog_connector_rust::{
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::LazyLock;
 
+
 static NEXT_SERVER_ID: LazyLock<AtomicU32> = LazyLock::new(|| {
     use std::time::{SystemTime, UNIX_EPOCH};
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
@@ -37,6 +38,10 @@ pub struct MySQLStreamDriver {
     binlog_client: Option<BinlogClient>,
     binlog_stream: Option<BinlogStream>,
     current_gtid: Option<String>,
+    current_binlog_file: Option<String>,
+    current_binlog_position: Option<u64>,
+    is_mariadb: bool,
+    use_gtid_checkpoints: bool,
     current_event: Option<Zval>,
     event_iterator_started: bool,
     connected: bool,
@@ -52,12 +57,15 @@ impl std::fmt::Debug for MySQLStreamDriver {
             .field("database", &self.database)
             .field("server_id", &self.server_id)
             .field("position", &self.position)
+            .field("is_mariadb", &self.is_mariadb)
+            .field("use_gtid_checkpoints", &self.use_gtid_checkpoints)
             .field("connected", &self.connected)
             .finish()
     }
 }
 
 impl MySQLStreamDriver {
+
     pub fn new(
         host: String,
         port: u16,
@@ -67,9 +75,9 @@ impl MySQLStreamDriver {
         server_id: Option<u32>,
     ) -> Self {
         MySQLStreamDriver {
-            host,
+            host: host.clone(),
             port,
-            user,
+            user: user.clone(),
             password,
             database,
             server_id,
@@ -78,6 +86,10 @@ impl MySQLStreamDriver {
             binlog_client: None,
             binlog_stream: None,
             current_gtid: None,
+            current_binlog_file: None,
+            current_binlog_position: None,
+            is_mariadb: false,
+            use_gtid_checkpoints: false,
             current_event: None,
             event_iterator_started: false,
             connected: false,
@@ -85,7 +97,7 @@ impl MySQLStreamDriver {
         }
     }
 
-    async fn validate_mysql_config(&self, pool: &Pool) -> Result<(), String> {
+    async fn validate_mysql_config(&mut self, pool: &Pool) -> Result<(), String> {
         let mut conn = pool.get_conn().await
             .map_err(|e| format!("Failed to get connection: {}", e))?;
         
@@ -128,7 +140,6 @@ impl MySQLStreamDriver {
             return Err(format!("binlog_row_metadata must be FULL, got: {}", binlog_row_metadata));
         }
         
-        // Check GTID configuration (MySQL only)
         // Detect database type by checking version
         let version: String = mysql_async::prelude::Queryable::query_first(
             &mut conn,
@@ -136,11 +147,11 @@ impl MySQLStreamDriver {
         ).await
             .map_err(|e| format!("Failed to query database version: {}", e))?
             .unwrap_or_default();
-        
-        let is_mariadb = version.to_lowercase().contains("mariadb");
-        
-        if !is_mariadb {
-            // MySQL uses gtid_mode
+
+        self.is_mariadb = version.to_lowercase().contains("mariadb");
+
+        if !self.is_mariadb {
+            // MySQL - check GTID configuration
             let gtid_mode: String = mysql_async::prelude::Queryable::query_first(
                 &mut conn,
                 "SHOW VARIABLES LIKE 'gtid_mode'"
@@ -148,10 +159,16 @@ impl MySQLStreamDriver {
                 .map_err(|e| format!("Failed to query gtid_mode: {}", e))?
                 .map(|row: (String, String)| row.1)
                 .unwrap_or_default();
-            
+
             if gtid_mode.to_uppercase() != "ON" {
                 return Err(format!("gtid_mode must be ON, got: {}", gtid_mode));
             }
+
+            // MySQL with GTID enabled - use GTID checkpointing
+            self.use_gtid_checkpoints = true;
+        } else {
+            // MariaDB - always use binlog file/position checkpointing (per spec)
+            self.use_gtid_checkpoints = false;
         }
         
         Ok(())
@@ -160,51 +177,135 @@ impl MySQLStreamDriver {
     async fn get_current_gtid(&self, pool: &Pool) -> Result<String, String> {
         let mut conn = pool.get_conn().await
             .map_err(|e| format!("Failed to get connection for GTID: {}", e))?;
-        
-        // Detect database type by checking version
-        let version: String = mysql_async::prelude::Queryable::query_first(
-            &mut conn,
-            "SELECT VERSION()"
-        ).await
-            .map_err(|e| format!("Failed to query database version: {}", e))?
-            .unwrap_or_default();
-        
-        let is_mariadb = version.to_lowercase().contains("mariadb");
-        
+
         // Use appropriate GTID variable based on database type
-        let gtid_query = if is_mariadb {
+        let gtid_query = if self.is_mariadb {
             "SELECT @@global.gtid_current_pos"
         } else {
             "SELECT @@global.gtid_executed"
         };
-        
+
         let gtid_position: String = mysql_async::prelude::Queryable::query_first(
             &mut conn,
             gtid_query
         ).await
             .map_err(|e| format!("Failed to query GTID position: {}", e))?
             .unwrap_or_default();
-            
+
         Ok(gtid_position)
     }
-    
+
+    async fn get_current_binlog_position(&mut self, pool: &Pool) -> Result<(String, u64), String> {
+        let mut conn = pool.get_conn().await
+            .map_err(|e| format!("Failed to get connection for binlog position: {}", e))?;
+
+        // Get current binlog file and position using SHOW MASTER STATUS
+        // Handle both MySQL and MariaDB by extracting columns by name from the row
+        use mysql_async::prelude::*;
+
+        let query = if self.is_mariadb {
+            "SHOW MASTER STATUS"
+        } else {
+            // MySQL 8.0+ uses SHOW BINARY LOG STATUS instead of SHOW MASTER STATUS
+            "SHOW BINARY LOG STATUS"
+        };
+
+        let result: Option<mysql_async::Row> = conn.query_first(query).await
+            .map_err(|e| format!("Failed to query master status: {}", e))?;
+
+        match result {
+            Some(row) => {
+                // Extract File and Position columns manually from the row
+                let file: String = row.get("File")
+                    .ok_or_else(|| "Missing File column in SHOW MASTER STATUS".to_string())?;
+
+                // Handle position - try different types since MySQL/MariaDB might return different types
+                let position = if let Some(pos_u64) = row.get::<u64, _>("Position") {
+                    // Position returned as u64 (MySQL)
+                    pos_u64
+                } else if let Some(pos_str) = row.get::<String, _>("Position") {
+                    // Position returned as string (MariaDB or other cases)
+                    pos_str.parse::<u64>()
+                        .map_err(|e| format!("Failed to parse binlog position '{}': {}", pos_str, e))?
+                } else {
+                    return Err("Missing or invalid Position column in SHOW MASTER STATUS".to_string());
+                };
+
+                self.current_binlog_file = Some(file.clone());
+                self.current_binlog_position = Some(position);
+                Ok((file, position))
+            }
+            None => Err("No master status available - is binary logging enabled?".to_string())
+        }
+    }
+
+    fn generate_checkpoint(&self, header: &EventHeader) -> String {
+        if self.use_gtid_checkpoints && !self.is_mariadb {
+            // MySQL with GTID - use "gtid:" prefix
+            if let Some(ref gtid) = self.current_gtid {
+                format!("gtid:{}", gtid)
+            } else {
+                // Fallback to file/position if GTID not available
+                self.generate_file_position_checkpoint(header)
+            }
+        } else {
+            // MariaDB or MySQL without GTID - use "file:" prefix
+            self.generate_file_position_checkpoint(header)
+        }
+    }
+
+    fn generate_file_position_checkpoint(&self, header: &EventHeader) -> String {
+        if let Some(ref binlog_client) = self.binlog_client {
+            // Use the current binlog file and position from the client
+            format!("file:{}:{}", binlog_client.binlog_filename, header.next_event_position)
+        } else if let (Some(ref file), Some(_pos)) = (&self.current_binlog_file, &self.current_binlog_position) {
+            // Use stored file and position from header
+            format!("file:{}:{}", file, header.next_event_position)
+        } else {
+            // Emergency fallback - use position from header
+            format!("file:binlog.{:06}:{}", header.next_event_position / 1_000_000, header.next_event_position)
+        }
+    }
+
+
     async fn initialize_binlog_client(&mut self) -> PhpResult<()> {
         let connection_url = format!("mysql://{}:{}@{}:{}",
             self.user, self.password, self.host, self.port);
 
-        let gtid_set = self.current_gtid.clone().unwrap_or_default();
+        let mut binlog_client = if !self.is_mariadb && self.use_gtid_checkpoints {
+            // MySQL with GTID - use GTID mode
+            let gtid_set = self.current_gtid.clone().unwrap_or_default();
+            BinlogClient {
+                url: connection_url,
+                binlog_filename: "".to_string(),
+                binlog_position: 4,
+                server_id: self.server_id.unwrap_or_else(|| {
+                    NEXT_SERVER_ID.fetch_add(1, Ordering::Relaxed)
+                }) as u64,
+                gtid_enabled: true,
+                gtid_set,
+                heartbeat_interval_secs: 30,
+                timeout_secs: 60,
+            }
+        } else {
+            // MariaDB (always) or MySQL without GTID - use binlog file/position
+            let binlog_file = self.current_binlog_file.clone().unwrap_or_else(|| {
+                String::new()
+            });
+            let binlog_position = self.current_binlog_position.unwrap_or(4);
 
-        let mut binlog_client = BinlogClient {
-            url: connection_url,
-            binlog_filename: "".to_string(),
-            binlog_position: 4,
-            server_id: self.server_id.unwrap_or_else(|| {
-                NEXT_SERVER_ID.fetch_add(1, Ordering::Relaxed)
-            }) as u64,
-            gtid_enabled: !gtid_set.is_empty(),
-            gtid_set,
-            heartbeat_interval_secs: 30,
-            timeout_secs: 60,
+            BinlogClient {
+                url: connection_url,
+                binlog_filename: binlog_file,
+                binlog_position: binlog_position as u32,
+                server_id: self.server_id.unwrap_or_else(|| {
+                    NEXT_SERVER_ID.fetch_add(1, Ordering::Relaxed)
+                }) as u64,
+                gtid_enabled: false,
+                gtid_set: String::new(), // Explicitly empty for MariaDB
+                heartbeat_interval_secs: 30,
+                timeout_secs: 60,
+            }
         };
 
         // Connect to binlog stream
@@ -319,7 +420,7 @@ impl MySQLStreamDriver {
         row: &RowEvent
     ) -> PhpResult<Zval> {
         let timestamp = header.timestamp as i64;
-        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
+        let checkpoint = self.generate_checkpoint(header);
         
         let after_data = self.create_data_object_from_row(table_map, row)?;
         
@@ -343,7 +444,7 @@ impl MySQLStreamDriver {
         after_row: &RowEvent
     ) -> PhpResult<Zval> {
         let timestamp = header.timestamp as i64;
-        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
+        let checkpoint = self.generate_checkpoint(header);
         
         let before_data = self.create_data_object_from_row(table_map, before_row)?;
         let after_data = self.create_data_object_from_row(table_map, after_row)?;
@@ -367,7 +468,7 @@ impl MySQLStreamDriver {
         row: &RowEvent
     ) -> PhpResult<Zval> {
         let timestamp = header.timestamp as i64;
-        let checkpoint = format!("{}:{}", header.next_event_position, timestamp);
+        let checkpoint = self.generate_checkpoint(header);
         
         let before_data = self.create_data_object_from_row(table_map, row)?;
         
@@ -558,15 +659,24 @@ impl StreamDriver for MySQLStreamDriver {
             // Create connection pool
             let pool = Pool::new(opts);
 
-            // Validate MySQL configuration
+            // Validate MySQL configuration (this also sets is_mariadb and use_gtid_checkpoints)
             self.validate_mysql_config(&pool).await
                 .map_err(|e| PhpException::default(format!("MySQL configuration invalid: {}", e).into()))?;
 
-            // Get current GTID position for binlog streaming
-            let current_gtid = self.get_current_gtid(&pool).await
-                .map_err(|e| PhpException::default(format!("Failed to get GTID: {}", e).into()))?;
+            // Get current GTID position for binlog streaming (only for MySQL with GTID)
+            if self.use_gtid_checkpoints && !self.is_mariadb {
+                let current_gtid = self.get_current_gtid(&pool).await
+                    .map_err(|e| PhpException::default(format!("Failed to get GTID: {}", e).into()))?;
+                self.current_gtid = Some(current_gtid);
+            }
 
-            self.current_gtid = Some(current_gtid);
+            // Always get binlog file/position for checkpointing
+            let (binlog_file, binlog_position) = self.get_current_binlog_position(&pool).await
+                .map_err(|e| PhpException::default(format!("Failed to get binlog position: {}", e).into()))?;
+
+            // Store for checkpoint generation
+            self.current_binlog_file = Some(binlog_file);
+            self.current_binlog_position = Some(binlog_position);
             self.pool = Some(pool);
             self.connected = true;
 
@@ -583,6 +693,10 @@ impl StreamDriver for MySQLStreamDriver {
         self.binlog_client = None;
         self.binlog_stream = None;
         self.current_gtid = None;
+        self.current_binlog_file = None;
+        self.current_binlog_position = None;
+        self.is_mariadb = false;
+        self.use_gtid_checkpoints = false;
         self.current_event = None;
         self.event_iterator_started = false;
         self.connected = false;
@@ -591,7 +705,19 @@ impl StreamDriver for MySQLStreamDriver {
         Ok(())
     }
 
-    fn set_checkpointer(&mut self, _checkpointer: &Zval) -> PhpResult<()> {
+    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
+        // Store the checkpointer for use during streaming
+        // For now, we just validate it exists and has the required methods
+        if checkpointer.is_null() {
+            return Ok(());
+        }
+
+        // Verify the checkpointer is an object (detailed method checking would require more complex PHP reflection)
+        if !checkpointer.is_object() {
+            return Err(PhpException::default("Checkpointer must be an object implementing StreamCheckpointerInterface".into()).into());
+        }
+
+        // TODO: Store checkpointer reference for use during iteration
         Ok(())
     }
 

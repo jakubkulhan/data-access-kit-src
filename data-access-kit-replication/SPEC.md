@@ -61,6 +61,9 @@ $url = 'mysql://user:password@localhost:3306?server_id=100';
 // MySQL with SSL
 $url = 'mysql://user:password@localhost:3306?server_id=100&ssl=true';
 
+// MariaDB (uses same mysql:// scheme, auto-detected)
+$url = 'mysql://user:password@localhost:3306?server_id=100';
+
 // Future: PostgreSQL logical replication
 $url = 'postgresql://user:password@localhost:5432?slot_name=my_slot';
 ```
@@ -197,7 +200,7 @@ class DeleteEvent implements EventInterface {
 }
 ```
 
-## MySQL Configuration Validation
+## MySQL/MariaDB Configuration Validation
 
 ### Required MySQL Settings
 
@@ -215,26 +218,49 @@ The extension must validate the following MySQL configuration when connecting:
    - Provides complete column metadata (MySQL 8.0+)
    - Query: `SHOW VARIABLES LIKE 'binlog_row_metadata'`
 
-4. **gtid_mode = ON**
+4. **gtid_mode = ON** (MySQL only)
    - Enables Global Transaction Identifier (GTID) mode
    - Query: `SHOW VARIABLES LIKE 'gtid_mode'`
 
-### Validation Process
+### Required MariaDB Settings
 
-Validation occurs automatically during connection establishment:
+For MariaDB, the extension validates:
+
+1. **binlog_format = ROW**
+   - Same as MySQL
+   - Query: `SHOW VARIABLES LIKE 'binlog_format'`
+
+2. **binlog_row_image = FULL**
+   - Same as MySQL
+   - Query: `SHOW VARIABLES LIKE 'binlog_row_image'`
+
+3. **gtid_domain_id** (MariaDB GTID)
+   - MariaDB uses domain-based GTIDs instead of MySQL's GTID mode
+   - Query: `SHOW VARIABLES LIKE 'gtid_domain_id'`
+   - Note: MariaDB GTID is always enabled but uses different format
+
+### Server Type Detection and Validation
+
+The extension automatically detects MySQL vs MariaDB and applies appropriate validation:
 
 ```php
 use DataAccessKit\Replication\Stream;
 
+// Works with both MySQL and MariaDB
 $stream = new Stream('mysql://user:pass@localhost:3306?server_id=100');
 
 try {
-    // Validation happens automatically in rewind() or explicit connect()
+    // Validation happens automatically - detects MySQL/MariaDB and validates accordingly
     $stream->connect();
 } catch (Exception $e) {
-    echo "MySQL binlog configuration invalid: " . $e->getMessage();
+    echo "Database binlog configuration invalid: " . $e->getMessage();
 }
 ```
+
+**Server Detection Process:**
+1. Query `SELECT VERSION()` to determine if server is MySQL or MariaDB
+2. Apply database-specific validation rules
+3. Use appropriate checkpointing strategy based on server type
 
 ## Column Metadata and Type Mapping
 
@@ -275,13 +301,49 @@ The extension uses TABLE_MAP_EVENT metadata to:
 
 Checkpointing is handled entirely through the PHP-side `StreamCheckpointerInterface`. The extension calls the checkpointer methods at appropriate times during stream processing.
 
+### Checkpointing Strategies
+
+The extension supports two checkpointing strategies with explicit prefixing:
+
+#### 1. GTID-Based Checkpointing (MySQL only)
+- **Format**: `gtid:` prefix followed by MySQL GTID string
+- **Example**: `gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23`
+- **Advantages**: Globally unique, works across server restarts and failovers
+- **Usage**: Only used for MySQL servers with GTID enabled
+
+#### 2. Binlog File/Position Checkpointing
+- **Format**: `file:` prefix followed by `filename:position`
+- **Example**: `file:mysql-bin.000123:45678`
+- **Usage**:
+  - Default for MariaDB (always used regardless of GTID support)
+  - Fallback for MySQL when GTID is not available or disabled
+- **Limitations**: File/position is server-specific and doesn't survive server changes
+
+### Server-Specific Checkpointing Behavior
+
+- **MySQL**: Uses GTID checkpointing when available, falls back to file/position
+- **MariaDB**: Always uses binlog file/position checkpointing (due to GTID complexity)
+
+### Checkpoint Format Examples
+
+```php
+// MySQL with GTID enabled
+$mysql_gtid = "gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23";
+
+// MySQL without GTID or MariaDB
+$binlog_pos = "file:mysql-bin.000123:45678";
+$mariadb_pos = "file:mariadb-bin.000042:12345";
+```
+
 ### Checkpointer Flow
 
 1. **Stream Start**: Extension calls `loadLastCheckpoint()` to determine starting position
-   - If `null` is returned, stream starts from current GTID (live events)
-   - If string is returned, stream starts from that checkpoint position
+   - If `null` is returned, stream starts from current position (live events)
+   - If string is returned, extension parses prefix (`gtid:` or `file:`) and starts from that checkpoint
 2. **Event Processing**: Extension processes events from the starting checkpoint
 3. **Periodic Checkpointing**: Extension calls `saveCheckpoint(string $checkpoint)` periodically with current position
+   - MySQL: Uses `gtid:` prefix when GTID is available, `file:` prefix otherwise
+   - MariaDB: Always uses `file:` prefix
 4. **Stream Restart**: On reconnection, process repeats from step 1
 
 ### PHP Checkpointer Implementation
@@ -289,14 +351,14 @@ Checkpointing is handled entirely through the PHP-side `StreamCheckpointerInterf
 ```php
 use DataAccessKit\Replication\StreamCheckpointerInterface;
 
-// File-based checkpointer
+// File-based checkpointer (works with prefixed checkpoint format)
 class FileCheckpointer implements StreamCheckpointerInterface {
     public function __construct(private string $filename) {}
-    
+
     public function loadLastCheckpoint(): ?string {
         return file_exists($this->filename) ? file_get_contents($this->filename) : null;
     }
-    
+
     public function saveCheckpoint(string $checkpoint): void {
         file_put_contents($this->filename, $checkpoint);
     }
@@ -305,22 +367,71 @@ class FileCheckpointer implements StreamCheckpointerInterface {
 // Database-based checkpointer
 class DatabaseCheckpointer implements StreamCheckpointerInterface {
     public function __construct(private PDO $pdo, private string $streamId) {}
-    
+
     public function loadLastCheckpoint(): ?string {
         $stmt = $this->pdo->prepare('SELECT checkpoint FROM stream_positions WHERE stream_id = ?');
         $stmt->execute([$this->streamId]);
         return $stmt->fetchColumn() ?: null;
     }
-    
+
     public function saveCheckpoint(string $checkpoint): void {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO stream_positions (stream_id, checkpoint) VALUES (?, ?) '
-            . 'ON DUPLICATE KEY UPDATE checkpoint = VALUES(checkpoint)'
+            'INSERT INTO stream_positions (stream_id, checkpoint, updated_at) VALUES (?, ?, NOW()) '
+            . 'ON DUPLICATE KEY UPDATE checkpoint = VALUES(checkpoint), updated_at = NOW()'
         );
         $stmt->execute([$this->streamId, $checkpoint]);
     }
 }
 ```
+
+### Database Schema for Checkpointing
+
+```sql
+CREATE TABLE stream_positions (
+    stream_id VARCHAR(255) PRIMARY KEY,
+    checkpoint TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### Checkpoint Format Specification
+
+The extension uses prefixed checkpoint strings for explicit format identification:
+
+#### GTID Format (MySQL Only)
+- **Format**: `gtid:` prefix followed by MySQL GTID string
+- **Examples**:
+  - Single transaction: `gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23`
+  - Transaction range: `gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:1-25`
+  - Multiple servers: `gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:1-25,4A2F5DB8-82BC-11E1-B23E-C80AA9429562:1-10`
+
+#### Binlog File/Position Format
+- **Format**: `file:` prefix followed by `filename:position`
+- **Examples**:
+  - MySQL: `file:mysql-bin.000123:45678`
+  - MariaDB: `file:mariadb-bin.000042:12345`
+  - Custom prefix: `file:binary-log.000001:1024`
+
+#### Format Detection Logic
+
+The extension uses simple prefix detection:
+
+```rust
+if checkpoint.starts_with("gtid:") {
+    CheckpointType::GTID
+} else if checkpoint.starts_with("file:") {
+    CheckpointType::BinlogPosition
+} else {
+    // Invalid checkpoint format
+    return Err("Invalid checkpoint format")
+}
+```
+
+#### Server-Specific Behavior
+
+- **MySQL with GTID**: Extension generates `gtid:` prefixed checkpoints
+- **MySQL without GTID**: Extension generates `file:` prefixed checkpoints
+- **MariaDB**: Extension always generates `file:` prefixed checkpoints (GTID complexity avoided)
 
 ## Error Handling
 
@@ -393,11 +504,11 @@ use DataAccessKit\Replication\{StreamCheckpointerInterface, StreamFilterInterfac
 
 class FileCheckpointer implements StreamCheckpointerInterface {
     public function __construct(private string $filename) {}
-    
+
     public function loadLastCheckpoint(): ?string {
         return file_exists($this->filename) ? file_get_contents($this->filename) : null;
     }
-    
+
     public function saveCheckpoint(string $checkpoint): void {
         file_put_contents($this->filename, $checkpoint);
     }
@@ -405,7 +516,7 @@ class FileCheckpointer implements StreamCheckpointerInterface {
 
 class TableFilter implements StreamFilterInterface {
     public function __construct(private array $allowedTables) {}
-    
+
     public function accept(string $type, string $schema, string $table): bool {
         return in_array("$schema.$table", $this->allowedTables);
     }
@@ -414,6 +525,7 @@ class TableFilter implements StreamFilterInterface {
 $checkpointer = new FileCheckpointer('/tmp/binlog_checkpoint.txt');
 $filter = new TableFilter(['mydb.users', 'mydb.orders']);
 
+// Works with both MySQL and MariaDB - extension auto-detects server type
 $connectionUrl = 'mysql://repl_user:password@localhost:3306?server_id=100';
 $stream = new Stream($connectionUrl);
 $stream->setCheckpointer($checkpointer);
@@ -422,9 +534,58 @@ $stream->setFilter($filter);
 foreach ($stream as $event) {
     // Process event
     processEvent($event);
-    
+
     // Checkpointing is handled automatically by the extension
-    // It calls $checkpointer->saveCheckpoint($position) periodically
+    // Extension uses prefixed checkpoint format:
+    // - MySQL GTID: "gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23"
+    // - MySQL binlog: "file:mysql-bin.000123:45678"
+    // - MariaDB: "file:mariadb-bin.000042:12345" (always file/position)
+}
+```
+
+### Advanced Checkpointing Examples
+
+```php
+<?php
+
+use DataAccessKit\Replication\Stream;
+
+// Example: Resume from specific checkpoint
+$pdo = new PDO('mysql:host=localhost;dbname=replication', $user, $pass);
+$checkpointer = new DatabaseCheckpointer($pdo, 'my_stream_001');
+
+$stream = new Stream('mysql://repl_user:password@localhost:3306?server_id=100');
+$stream->setCheckpointer($checkpointer);
+
+foreach ($stream as $event) {
+    echo "Processing {$event->type} event from {$event->schema}.{$event->table}\n";
+    echo "Current checkpoint: {$event->checkpoint}\n";
+
+    // Process event...
+    processEvent($event);
+
+    // Extension automatically saves checkpoint with appropriate prefix:
+    // - MySQL with GTID: "gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23"
+    // - MySQL without GTID: "file:mysql-bin.000123:45678"
+    // - MariaDB: "file:mariadb-bin.000042:12345"
+}
+
+// Example: Manual checkpoint handling
+class LoggingCheckpointer implements StreamCheckpointerInterface {
+    public function __construct(private string $filename) {}
+
+    public function loadLastCheckpoint(): ?string {
+        $checkpoint = file_exists($this->filename) ? file_get_contents($this->filename) : null;
+        if ($checkpoint) {
+            echo "Resuming from checkpoint: $checkpoint\n";
+        }
+        return $checkpoint;
+    }
+
+    public function saveCheckpoint(string $checkpoint): void {
+        echo "Saving checkpoint: $checkpoint\n";
+        file_put_contents($this->filename, $checkpoint);
+    }
 }
 ```
 

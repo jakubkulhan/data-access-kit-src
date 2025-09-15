@@ -664,6 +664,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "ext-php-rs",
+ "libc",
  "log",
  "mysql-binlog-connector-rust",
  "mysql_async",
