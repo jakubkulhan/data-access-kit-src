@@ -191,9 +191,9 @@ impl MySQLStreamDriver {
     async fn initialize_binlog_client(&mut self) -> PhpResult<()> {
         let connection_url = format!("mysql://{}:{}@{}:{}",
             self.user, self.password, self.host, self.port);
-            
+
         let gtid_set = self.current_gtid.clone().unwrap_or_default();
-        
+
         let mut binlog_client = BinlogClient {
             url: connection_url,
             binlog_filename: "".to_string(),
@@ -206,11 +206,11 @@ impl MySQLStreamDriver {
             heartbeat_interval_secs: 30,
             timeout_secs: 60,
         };
-        
+
         // Connect to binlog stream
         let binlog_stream = binlog_client.connect().await
             .map_err(|e| PhpException::default(format!("Failed to connect to binlog: {}", e).into()))?;
-            
+
         self.binlog_stream = Some(binlog_stream);
         self.binlog_client = Some(binlog_client);
         Ok(())
@@ -235,7 +235,7 @@ impl MySQLStreamDriver {
                             // Continue to next event, don't return table map events to PHP
                             continue;
                         },
-                        
+
                         // Handle row events that we want to convert to PHP events
                         EventData::WriteRows(write_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&write_rows_event.table_id) {
@@ -297,7 +297,7 @@ impl MySQLStreamDriver {
                             // Skip if no table map found
                             continue;
                         },
-                        
+
                         // Skip all other event types
                         _ => {
                             continue;
@@ -383,35 +383,42 @@ impl MySQLStreamDriver {
         ).map(|opt| opt.unwrap())
     }
     
-    fn create_data_object_from_row(&self, _table_map: &TableMapEvent, row: &RowEvent) -> PhpResult<Zval> {
-        use std::collections::HashMap;
-        
-        // Create a PHP stdClass object using column names from table map
-        let mut map = HashMap::new();
-        
-        // Since we don't have column names in the table map event from this crate,
-        // we'll use column indices as keys for now. In a full implementation,
-        // you'd need to query the database schema to get column names.
-        for (i, column_value) in row.column_values.iter().enumerate() {
-            let key = format!("col_{}", i); // Use column index as key
-            let php_value = self.convert_column_value_to_php(column_value)?;
-            map.insert(key, php_value);
-        }
-        
-        let mut obj_zval = Zval::new();
-        obj_zval.set_array(map)?;
-        
-        // Convert to stdClass object
+    fn create_data_object_from_row(&self, table_map: &TableMapEvent, row: &RowEvent) -> PhpResult<Zval> {
+        // Convert to stdClass object with proper column names
         let stdclass_ce = zend::ClassEntry::try_find("stdClass")
             .ok_or_else(|| PhpException::default("stdClass not found".into()))?;
-        
+
         let mut obj = ext_php_rs::types::ZendObject::new(stdclass_ce);
+
         for (i, column_value) in row.column_values.iter().enumerate() {
-            let prop_name = format!("col_{}", i);
+            // Get column name from table metadata - error if unavailable
+            let column_name = if let Some(ref table_metadata) = table_map.table_metadata {
+                if let Some(column_metadata) = table_metadata.columns.get(i) {
+                    if let Some(ref name) = column_metadata.column_name {
+                        name.clone()
+                    } else {
+                        return Err(PhpException::default(
+                            format!("Column name not available for column index {} in table {}.{}",
+                                i, table_map.database_name, table_map.table_name).into()
+                        ).into());
+                    }
+                } else {
+                    return Err(PhpException::default(
+                        format!("Column metadata not available for column index {} in table {}.{}",
+                            i, table_map.database_name, table_map.table_name).into()
+                    ).into());
+                }
+            } else {
+                return Err(PhpException::default(
+                    format!("Table metadata not available for table {}.{} - ensure binlog_row_metadata=FULL",
+                        table_map.database_name, table_map.table_name).into()
+                ).into());
+            };
+
             let prop_zval = self.convert_column_value_to_php(column_value)?;
-            obj.set_property(&prop_name, prop_zval)?;
+            obj.set_property(&column_name, prop_zval)?;
         }
-        
+
         let mut result = Zval::new();
         result.set_object(&mut *obj.into_raw());
         Ok(result)
@@ -558,7 +565,7 @@ impl StreamDriver for MySQLStreamDriver {
             // Get current GTID position for binlog streaming
             let current_gtid = self.get_current_gtid(&pool).await
                 .map_err(|e| PhpException::default(format!("Failed to get GTID: {}", e).into()))?;
-            
+
             self.current_gtid = Some(current_gtid);
             self.pool = Some(pool);
             self.connected = true;
@@ -596,7 +603,7 @@ impl StreamDriver for MySQLStreamDriver {
         if !self.connected || !self.event_iterator_started {
             return Ok(None);
         }
-        
+
         // Return the current event if available
         if let Some(ref event) = self.current_event {
             // Create a new Zval and copy the content
@@ -607,6 +614,7 @@ impl StreamDriver for MySQLStreamDriver {
             }
             Ok(Some(result))
         } else {
+            // No current event - this is normal at the start or when no events are available
             Ok(None)
         }
     }
@@ -619,7 +627,7 @@ impl StreamDriver for MySQLStreamDriver {
         if !self.connected || !self.event_iterator_started {
             return Err(PhpException::default("Stream not connected or not started".into()).into());
         }
-        
+
         self.position += 1;
         self.fetch_next_event()?;
         Ok(())
@@ -630,21 +638,21 @@ impl StreamDriver for MySQLStreamDriver {
         if !self.connected {
             self.connect()?;
         }
-        
+
         // Initialize binlog client with current GTID (async)
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
-        
+
         rt.block_on(async {
             self.initialize_binlog_client().await
         })?;
-        
+
         self.position = 0;
         self.event_iterator_started = true;
-        
+
         // Fetch the first event
         self.fetch_next_event()?;
-        
+
         Ok(())
     }
 

@@ -1533,7 +1533,7 @@ dependencies = [
 [[package]]
 name = "mysql-binlog-connector-rust"
 version = "0.3.2"
-source = "git+https://github.com/apecloud/mysql-binlog-connector-rust#62c53624f434fe2cfc18814517900efb2523ccdd"
+source = "git+https://github.com/jakubkulhan/mysql-binlog-connector-rust?branch=table-metadata#4c7cd44ceed0303ca982ab5bce3ba1c278186dd2"
 dependencies = [
  "async-recursion",
  "async-std",

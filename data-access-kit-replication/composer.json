@@ -14,7 +14,7 @@
         }
     },
     "scripts": {
-        "build": "cargo build --release",
+        "build": "cargo build",
         "test:unit": [
             "@build",
             "php -c php.ini vendor/bin/phpunit --group unit"
