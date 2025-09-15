@@ -6,14 +6,17 @@ use std::sync::Once;
 use url::Url;
 
 mod mysql;
+mod checkpointer;
+
 use mysql::MySQLStreamDriver;
+use checkpointer::Checkpointer;
 
 static INTERFACES_INIT: Once = Once::new();
 
 trait StreamDriver: std::fmt::Debug {
     fn connect(&mut self) -> PhpResult<()>;
     fn disconnect(&mut self) -> PhpResult<()>;
-    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()>;
+    fn set_checkpointer(&mut self, checkpointer: Option<Checkpointer>) -> PhpResult<()>;
     fn set_filter(&mut self, filter: &Zval) -> PhpResult<()>;
     fn current(&self) -> PhpResult<Option<Zval>>;
     fn key(&self) -> PhpResult<i32>;
@@ -98,7 +101,13 @@ impl Stream {
     }
 
     pub fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
-        self.driver.set_checkpointer(checkpointer)
+        let wrapper = if checkpointer.is_null() {
+            None
+        } else {
+            Some(Checkpointer::new(checkpointer)?)
+        };
+
+        self.driver.set_checkpointer(wrapper)
     }
 
     pub fn set_filter(&mut self, filter: &Zval) -> PhpResult<()> {

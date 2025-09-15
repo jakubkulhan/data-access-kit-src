@@ -1,7 +1,7 @@
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
 use ext_php_rs::zend;
-use crate::StreamDriver;
+use crate::{StreamDriver, Checkpointer};
 use mysql_async::{Pool, OptsBuilder};
 use mysql_binlog_connector_rust::{
     binlog_client::BinlogClient,
@@ -46,6 +46,7 @@ pub struct MySQLStreamDriver {
     event_iterator_started: bool,
     connected: bool,
     table_map: std::collections::HashMap<u64, TableMapEvent>,
+    checkpointer: Option<Checkpointer>,
 }
 
 impl std::fmt::Debug for MySQLStreamDriver {
@@ -94,6 +95,7 @@ impl MySQLStreamDriver {
             event_iterator_started: false,
             connected: false,
             table_map: std::collections::HashMap::new(),
+            checkpointer: None,
         }
     }
 
@@ -267,6 +269,73 @@ impl MySQLStreamDriver {
         }
     }
 
+    /// Save the current checkpoint using the configured checkpointer
+    fn save_current_checkpoint(&self, header: &EventHeader) -> PhpResult<()> {
+        if let Some(ref checkpointer) = self.checkpointer {
+            let checkpoint = self.generate_checkpoint(header);
+            checkpointer.save_checkpoint(&checkpoint)?;
+        }
+        // If no checkpointer is configured, silently continue
+        Ok(())
+    }
+
+    /// Load checkpoint from checkpointer if available and apply it
+    fn load_checkpoint_if_available(&mut self) -> PhpResult<()> {
+        if let Some(ref checkpointer) = self.checkpointer {
+            if let Some(checkpoint_str) = checkpointer.load_last_checkpoint()? {
+                self.apply_checkpoint(&checkpoint_str)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Parse and apply a checkpoint string to set the starting position
+    fn apply_checkpoint(&mut self, checkpoint: &str) -> PhpResult<()> {
+        if checkpoint.starts_with("gtid:") {
+            // GTID checkpoint format: "gtid:3E11FA47-71CA-11E1-9E33-C80AA9429562:23"
+            let gtid_str = &checkpoint[5..]; // Remove "gtid:" prefix
+            self.current_gtid = Some(gtid_str.to_string());
+
+            // When using GTID, we don't need specific binlog file/position
+            self.current_binlog_file = None;
+            self.current_binlog_position = None;
+
+        } else if checkpoint.starts_with("file:") {
+            // File/position checkpoint format: "file:mysql-bin.000123:45678"
+            let file_pos_str = &checkpoint[5..]; // Remove "file:" prefix
+
+            if let Some(colon_pos) = file_pos_str.rfind(':') {
+                let filename = &file_pos_str[..colon_pos];
+                let position_str = &file_pos_str[colon_pos + 1..];
+
+                match position_str.parse::<u64>() {
+                    Ok(position) => {
+                        self.current_binlog_file = Some(filename.to_string());
+                        self.current_binlog_position = Some(position);
+
+                        // Clear GTID when using file/position
+                        self.current_gtid = None;
+                    }
+                    Err(e) => {
+                        return Err(PhpException::default(
+                            format!("Invalid binlog position in checkpoint '{}': {}", checkpoint, e).into()
+                        ).into());
+                    }
+                }
+            } else {
+                return Err(PhpException::default(
+                    format!("Invalid file checkpoint format: '{}'", checkpoint).into()
+                ).into());
+            }
+        } else {
+            return Err(PhpException::default(
+                format!("Invalid checkpoint format: '{}'. Must start with 'gtid:' or 'file:'", checkpoint).into()
+            ).into());
+        }
+
+        Ok(())
+    }
+
 
     async fn initialize_binlog_client(&mut self) -> PhpResult<()> {
         let connection_url = format!("mysql://{}:{}@{}:{}",
@@ -343,12 +412,14 @@ impl MySQLStreamDriver {
                                 // Convert to InsertEvent  
                                 for row in &write_rows_event.rows {
                                     match self.create_insert_event_from_binlog(
-                                        &header, 
-                                        table_map, 
+                                        &header,
+                                        table_map,
                                         row
                                     ) {
                                         Ok(event_obj) => {
                                             self.current_event = Some(event_obj);
+                                            // Save checkpoint after successfully creating event
+                                            self.save_current_checkpoint(&header)?;
                                             return Ok(());
                                         }
                                         Err(e) => {
@@ -375,6 +446,8 @@ impl MySQLStreamDriver {
                                         after_row
                                     )?;
                                     self.current_event = Some(event_obj);
+                                    // Save checkpoint after successfully creating event
+                                    self.save_current_checkpoint(&header)?;
                                     return Ok(());
                                 }
                             }
@@ -392,6 +465,8 @@ impl MySQLStreamDriver {
                                         row
                                     )?;
                                     self.current_event = Some(event_obj);
+                                    // Save checkpoint after successfully creating event
+                                    self.save_current_checkpoint(&header)?;
                                     return Ok(());
                                 }
                             }
@@ -664,19 +739,26 @@ impl StreamDriver for MySQLStreamDriver {
                 .map_err(|e| PhpException::default(format!("MySQL configuration invalid: {}", e).into()))?;
 
             // Get current GTID position for binlog streaming (only for MySQL with GTID)
-            if self.use_gtid_checkpoints && !self.is_mariadb {
+            // Only set if not already set by checkpoint
+            if self.use_gtid_checkpoints && !self.is_mariadb && self.current_gtid.is_none() {
                 let current_gtid = self.get_current_gtid(&pool).await
                     .map_err(|e| PhpException::default(format!("Failed to get GTID: {}", e).into()))?;
                 self.current_gtid = Some(current_gtid);
             }
 
-            // Always get binlog file/position for checkpointing
-            let (binlog_file, binlog_position) = self.get_current_binlog_position(&pool).await
-                .map_err(|e| PhpException::default(format!("Failed to get binlog position: {}", e).into()))?;
+            // Always get binlog file/position for checkpointing if not set by checkpoint
+            if self.current_binlog_file.is_none() || self.current_binlog_position.is_none() {
+                let (binlog_file, binlog_position) = self.get_current_binlog_position(&pool).await
+                    .map_err(|e| PhpException::default(format!("Failed to get binlog position: {}", e).into()))?;
 
-            // Store for checkpoint generation
-            self.current_binlog_file = Some(binlog_file);
-            self.current_binlog_position = Some(binlog_position);
+                // Store for checkpoint generation only if not already set
+                if self.current_binlog_file.is_none() {
+                    self.current_binlog_file = Some(binlog_file);
+                }
+                if self.current_binlog_position.is_none() {
+                    self.current_binlog_position = Some(binlog_position);
+                }
+            }
             self.pool = Some(pool);
             self.connected = true;
 
@@ -701,23 +783,13 @@ impl StreamDriver for MySQLStreamDriver {
         self.event_iterator_started = false;
         self.connected = false;
         self.table_map.clear();
+        self.checkpointer = None;
         
         Ok(())
     }
 
-    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
-        // Store the checkpointer for use during streaming
-        // For now, we just validate it exists and has the required methods
-        if checkpointer.is_null() {
-            return Ok(());
-        }
-
-        // Verify the checkpointer is an object (detailed method checking would require more complex PHP reflection)
-        if !checkpointer.is_object() {
-            return Err(PhpException::default("Checkpointer must be an object implementing StreamCheckpointerInterface".into()).into());
-        }
-
-        // TODO: Store checkpointer reference for use during iteration
+    fn set_checkpointer(&mut self, checkpointer: Option<Checkpointer>) -> PhpResult<()> {
+        self.checkpointer = checkpointer;
         Ok(())
     }
 
@@ -765,7 +837,11 @@ impl StreamDriver for MySQLStreamDriver {
             self.connect()?;
         }
 
-        // Initialize binlog client with current GTID (async)
+        // Load checkpoint BEFORE creating BinlogClient so it uses the checkpoint position
+        // instead of the current database position
+        self.load_checkpoint_if_available()?;
+
+        // Initialize binlog client with checkpoint position (async)
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
 

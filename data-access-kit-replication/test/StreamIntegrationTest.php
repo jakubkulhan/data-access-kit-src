@@ -3,7 +3,6 @@
 namespace DataAccessKit\Replication\Test;
 
 use PHPUnit\Framework\Attributes\Group;
-use PHPUnit\Framework\TestCase;
 use DataAccessKit\Replication\Stream;
 use DataAccessKit\Replication\EventInterface;
 use DataAccessKit\Replication\InsertEvent;
@@ -12,181 +11,11 @@ use DataAccessKit\Replication\DeleteEvent;
 use Exception;
 
 #[Group("database")]
-class StreamIntegrationTest extends TestCase
+class StreamIntegrationTest extends AbstractIntegrationTestCase
 {
-    private ?string $originalBinlogFormat = null;
-    private ?string $originalBinlogRowImage = null;
-    private ?string $originalBinlogRowMetadata = null;
-    private ?\PDO $pdo = null;
-    private ?array $dbConfig = null;
-    private ?array $replicationConfig = null;
-
-    protected function setUp(): void
-    {
-        $databaseUrl = $_ENV['DATABASE_URL'] ?? getenv('DATABASE_URL');
-        if (!$databaseUrl) {
-            return; // Skip setup if no database URL
-        }
-        
-        $parsedUrl = parse_url($databaseUrl);
-        $this->dbConfig = [
-            'host' => $parsedUrl['host'] ?? 'localhost',
-            'port' => $parsedUrl['port'] ?? 3306,
-            'user' => $parsedUrl['user'] ?? 'root',
-            'password' => $parsedUrl['pass'] ?? '',
-        ];
-        
-        // Get replication database URL for binlog streaming
-        $replicationUrl = $_ENV['REPLICATION_DATABASE_URL'] ?? getenv('REPLICATION_DATABASE_URL');
-        if ($replicationUrl) {
-            $replicationParsedUrl = parse_url($replicationUrl);
-            $this->replicationConfig = [
-                'host' => $replicationParsedUrl['host'] ?? $this->dbConfig['host'],
-                'port' => $replicationParsedUrl['port'] ?? $this->dbConfig['port'],
-                'user' => $replicationParsedUrl['user'] ?? 'replication_test',
-                'password' => $replicationParsedUrl['pass'] ?? 'replication_test',
-            ];
-        } else {
-            // Fall back to using same credentials as main database
-            $this->replicationConfig = $this->dbConfig;
-        }
-        
-        try {
-            $this->pdo = new \PDO(
-                "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']}", 
-                $this->dbConfig['user'], 
-                $this->dbConfig['password']
-            );
-            
-            // Store original values
-            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_format");
-            $this->originalBinlogFormat = $stmt->fetchColumn();
-            
-            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_row_image");
-            $this->originalBinlogRowImage = $stmt->fetchColumn();
-            
-            $stmt = $this->pdo->query("SELECT @@GLOBAL.binlog_row_metadata");
-            $this->originalBinlogRowMetadata = $stmt->fetchColumn();
-            
-            // Set correct values for tests using prepared statements
-            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
-            $stmt->execute(['ROW']);
-            
-            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
-            $stmt->execute(['FULL']);
-            
-            $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
-            $stmt->execute(['FULL']);
-            
-        } catch (\Exception $e) {
-            // Ignore setup errors for tests that don't need database
-        }
-    }
-    
-    protected function tearDown(): void
-    {
-        if ($this->pdo === null) {
-            return;
-        }
-        
-        try {
-            // Restore original values using prepared statements
-            if ($this->originalBinlogFormat !== null) {
-                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
-                $stmt->execute([$this->originalBinlogFormat]);
-            }
-            if ($this->originalBinlogRowImage !== null) {
-                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
-                $stmt->execute([$this->originalBinlogRowImage]);
-            }
-            if ($this->originalBinlogRowMetadata !== null) {
-                $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
-                $stmt->execute([$this->originalBinlogRowMetadata]);
-            }
-        } catch (\Exception $e) {
-            // Ignore teardown errors
-        }
-        
-        $this->pdo = null;
-        $this->dbConfig = null;
-    }
-
-    private function createConnectionUrl(array $params = []): string
-    {
-        if ($this->dbConfig === null) {
-            throw new \Exception('Database configuration not available');
-        }
-        
-        // Extract database from params if provided
-        $database = isset($params['database']) ? '/' . $params['database'] : '';
-        unset($params['database']); // Remove from query params
-        
-        $queryParams = array_merge(['server_id' => '100'], $params);
-        $queryString = http_build_query($queryParams);
-        
-        // Build URL based on whether password is provided
-        if (!empty($this->dbConfig['password'])) {
-            return sprintf(
-                'mysql://%s:%s@%s:%d%s?%s',
-                $this->dbConfig['user'],
-                $this->dbConfig['password'],
-                $this->dbConfig['host'],
-                $this->dbConfig['port'],
-                $database,
-                $queryString
-            );
-        } else {
-            return sprintf(
-                'mysql://%s@%s:%d%s?%s',
-                $this->dbConfig['user'],
-                $this->dbConfig['host'],
-                $this->dbConfig['port'],
-                $database,
-                $queryString
-            );
-        }
-    }
-    
-    private function createReplicationConnectionUrl(array $params = []): string
-    {
-        if ($this->replicationConfig === null) {
-            throw new \Exception('Replication configuration not available');
-        }
-        
-        // Extract database from params if provided
-        $database = isset($params['database']) ? '/' . $params['database'] : '';
-        unset($params['database']); // Remove from query params
-        
-        $queryParams = array_merge(['server_id' => '100'], $params);
-        $queryString = http_build_query($queryParams);
-        
-        // Build URL based on whether password is provided
-        if (!empty($this->replicationConfig['password'])) {
-            return sprintf(
-                'mysql://%s:%s@%s:%d%s?%s',
-                $this->replicationConfig['user'],
-                $this->replicationConfig['password'],
-                $this->replicationConfig['host'],
-                $this->replicationConfig['port'],
-                $database,
-                $queryString
-            );
-        } else {
-            return sprintf(
-                'mysql://%s@%s:%d%s?%s',
-                $this->replicationConfig['user'],
-                $this->replicationConfig['host'],
-                $this->replicationConfig['port'],
-                $database,
-                $queryString
-            );
-        }
-    }
     public function testCompleteStreamFlow(): void
     {
-        if ($this->pdo === null) {
-            $this->markTestSkipped('DATABASE_URL environment variable is required');
-        }
+        $this->requireDatabase();
 
         $stream = null;
 
@@ -336,9 +165,7 @@ class StreamIntegrationTest extends TestCase
 
     public function testMysqlConfigurationValidationBinlogFormatFailure(): void
     {
-        if ($this->pdo === null) {
-            $this->markTestSkipped('DATABASE_URL environment variable is required');
-        }
+        $this->requireDatabase();
         
         // Set invalid binlog_format globally
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_format = ?");
@@ -353,9 +180,7 @@ class StreamIntegrationTest extends TestCase
 
     public function testMysqlConfigurationValidationBinlogRowImageFailure(): void
     {
-        if ($this->pdo === null) {
-            $this->markTestSkipped('DATABASE_URL environment variable is required');
-        }
+        $this->requireDatabase();
         
         // Set invalid binlog_row_image globally
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_image = ?");
@@ -370,9 +195,7 @@ class StreamIntegrationTest extends TestCase
 
     public function testMysqlConfigurationValidationBinlogRowMetadataFailure(): void
     {
-        if ($this->pdo === null) {
-            $this->markTestSkipped('DATABASE_URL environment variable is required');
-        }
+        $this->requireDatabase();
         
         // Set invalid binlog_row_metadata globally
         $stmt = $this->pdo->prepare("SET @@GLOBAL.binlog_row_metadata = ?");
@@ -387,9 +210,7 @@ class StreamIntegrationTest extends TestCase
 
     public function testMysqlConfigurationValidationGtidModeFailure(): void
     {
-        if ($this->pdo === null) {
-            $this->markTestSkipped('DATABASE_URL environment variable is required');
-        }
+        $this->requireDatabase();
         
         // Detect database type
         $stmt = $this->pdo->query("SELECT VERSION()");
