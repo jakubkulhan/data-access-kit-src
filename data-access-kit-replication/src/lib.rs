@@ -7,9 +7,11 @@ use url::Url;
 
 mod mysql;
 mod checkpointer;
+mod filter;
 
 use mysql::MySQLStreamDriver;
 use checkpointer::Checkpointer;
+use filter::Filter;
 
 static INTERFACES_INIT: Once = Once::new();
 

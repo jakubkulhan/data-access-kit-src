@@ -1,7 +1,7 @@
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
 use ext_php_rs::zend;
-use crate::{StreamDriver, Checkpointer};
+use crate::{StreamDriver, Checkpointer, Filter};
 use mysql_async::{Pool, OptsBuilder};
 use mysql_binlog_connector_rust::{
     binlog_client::BinlogClient,
@@ -47,6 +47,7 @@ pub struct MySQLStreamDriver {
     connected: bool,
     table_map: std::collections::HashMap<u64, TableMapEvent>,
     checkpointer: Option<Checkpointer>,
+    filter: Option<Filter>,
 }
 
 impl std::fmt::Debug for MySQLStreamDriver {
@@ -96,6 +97,7 @@ impl MySQLStreamDriver {
             connected: false,
             table_map: std::collections::HashMap::new(),
             checkpointer: None,
+            filter: None,
         }
     }
 
@@ -409,7 +411,25 @@ impl MySQLStreamDriver {
                         // Handle row events that we want to convert to PHP events
                         EventData::WriteRows(write_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&write_rows_event.table_id) {
-                                // Convert to InsertEvent  
+                                // Check filter before processing
+                                if let Some(ref filter) = self.filter {
+                                    match filter.accept("INSERT", &table_map.database_name, &table_map.table_name) {
+                                        Ok(false) => {
+                                            // Event is filtered out, skip it and continue to next event
+                                            continue;
+                                        }
+                                        Ok(true) => {
+                                            // Event is accepted, continue processing
+                                        }
+                                        Err(e) => {
+                                            // Filter error - log and skip this event
+                                            eprintln!("Filter error: {:?}", e);
+                                            continue;
+                                        }
+                                    }
+                                }
+
+                                // Convert to InsertEvent
                                 for row in &write_rows_event.rows {
                                     match self.create_insert_event_from_binlog(
                                         &header,
@@ -437,6 +457,24 @@ impl MySQLStreamDriver {
                         
                         EventData::UpdateRows(update_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&update_rows_event.table_id) {
+                                // Check filter before processing
+                                if let Some(ref filter) = self.filter {
+                                    match filter.accept("UPDATE", &table_map.database_name, &table_map.table_name) {
+                                        Ok(false) => {
+                                            // Event is filtered out, skip it and continue to next event
+                                            continue;
+                                        }
+                                        Ok(true) => {
+                                            // Event is accepted, continue processing
+                                        }
+                                        Err(e) => {
+                                            // Filter error - log and skip this event
+                                            eprintln!("Filter error: {:?}", e);
+                                            continue;
+                                        }
+                                    }
+                                }
+
                                 // Convert to UpdateEvent
                                 for (before_row, after_row) in &update_rows_event.rows {
                                     let event_obj = self.create_update_event_from_binlog(
@@ -457,6 +495,24 @@ impl MySQLStreamDriver {
                         
                         EventData::DeleteRows(delete_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&delete_rows_event.table_id) {
+                                // Check filter before processing
+                                if let Some(ref filter) = self.filter {
+                                    match filter.accept("DELETE", &table_map.database_name, &table_map.table_name) {
+                                        Ok(false) => {
+                                            // Event is filtered out, skip it and continue to next event
+                                            continue;
+                                        }
+                                        Ok(true) => {
+                                            // Event is accepted, continue processing
+                                        }
+                                        Err(e) => {
+                                            // Filter error - log and skip this event
+                                            eprintln!("Filter error: {:?}", e);
+                                            continue;
+                                        }
+                                    }
+                                }
+
                                 // Convert to DeleteEvent
                                 for row in &delete_rows_event.rows {
                                     let event_obj = self.create_delete_event_from_binlog(
@@ -784,6 +840,7 @@ impl StreamDriver for MySQLStreamDriver {
         self.connected = false;
         self.table_map.clear();
         self.checkpointer = None;
+        self.filter = None;
         
         Ok(())
     }
@@ -793,7 +850,14 @@ impl StreamDriver for MySQLStreamDriver {
         Ok(())
     }
 
-    fn set_filter(&mut self, _filter: &Zval) -> PhpResult<()> {
+    fn set_filter(&mut self, filter: &Zval) -> PhpResult<()> {
+        let wrapper = if filter.is_null() {
+            None
+        } else {
+            Some(Filter::new(filter)?)
+        };
+
+        self.filter = wrapper;
         Ok(())
     }
 
