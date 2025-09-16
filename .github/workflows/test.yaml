@@ -54,3 +54,58 @@ jobs:
       - run: composer test:database:env
         env:
           DATABASE_URL: ${{ matrix.database.database_url }}
+
+  test-replication-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Install Composer dependencies
+        working-directory: ./data-access-kit-replication
+        run: composer install --no-dev
+      - name: Run unit tests
+        working-directory: ./data-access-kit-replication
+        run: composer run test:unit
+
+  test-replication-database:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+        - service: mysql
+          database_url: mysql://root@127.0.0.1:32016
+          replication_database_url: mysql://replication_test:replication_test@127.0.0.1:32016
+        - service: mariadb
+          database_url: mysql://root@127.0.0.1:35098
+          replication_database_url: mysql://replication_test:replication_test@127.0.0.1:35098
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - uses: adambirds/docker-compose-action@v1.5.0
+        with:
+          compose-file: docker-compose.yaml
+          services: ${{ matrix.database.service }}
+      - name: Wait for container health
+        run: |
+          timeout 30s bash -c 'until docker inspect --format="{{.State.Health.Status}}" data-access-kit-src-${{ matrix.database.service }}-1 | grep -q "healthy"; do
+            echo "Waiting for container to be healthy..."
+            sleep 2
+          done'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+      - name: Install Composer dependencies
+        working-directory: ./data-access-kit-replication
+        run: composer install --no-dev
+      - name: Run database tests
+        working-directory: ./data-access-kit-replication
+        run: composer run test:database:env
+        env:
+          DATABASE_URL: ${{ matrix.database.database_url }}
+          REPLICATION_DATABASE_URL: ${{ matrix.database.replication_database_url }}

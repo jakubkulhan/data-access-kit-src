@@ -17,11 +17,11 @@
         "build": "cargo build",
         "test:unit": [
             "@build",
-            "php -c php.ini vendor/bin/phpunit --group unit"
+            "php -c php-$(uname -s | tr '[:upper:]' '[:lower:]').ini vendor/bin/phpunit --group unit"
         ],
         "test:database:env": [
             "@build",
-            "php -c php.ini vendor/bin/phpunit --group database"
+            "php -c php-$(uname -s | tr '[:upper:]' '[:lower:]').ini vendor/bin/phpunit --group database"
         ],
         "test:database:mysql": "DATABASE_URL=mysql://root@127.0.0.1:32016 REPLICATION_DATABASE_URL=mysql://replication_test:replication_test@127.0.0.1:32016 composer run test:database:env",
         "test:database:mariadb": "DATABASE_URL=mysql://root@127.0.0.1:35098 REPLICATION_DATABASE_URL=mysql://replication_test:replication_test@127.0.0.1:35098 composer run test:database:env",
