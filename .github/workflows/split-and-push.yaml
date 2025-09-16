@@ -11,6 +11,7 @@ jobs:
         project:
           - data-access-kit
           - data-access-kit-symfony
+          - data-access-kit-replication
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,5 +25,6 @@ jobs:
           ssh-private-key: |
             ${{ secrets.DATA_ACCESS_KIT_DEPLOY_KEY }}
             ${{ secrets.DATA_ACCESS_KIT_SYMFONY_DEPLOY_KEY }}
+            ${{ secrets.DATA_ACCESS_KIT_REPLICATION_DEPLOY_KEY }}
       - run: git subtree split --prefix=${{ matrix.project }} --branch project-branch
       - run: git push --force git@github.com:${{ github.repository_owner }}/${{ matrix.project }}.git project-branch:main
