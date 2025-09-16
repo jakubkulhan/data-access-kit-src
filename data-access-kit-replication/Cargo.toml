@@ -8,17 +8,12 @@ crate-type = ["cdylib"]
 
 [dependencies]
 ext-php-rs = "0.14.2"
-mysql_async = "0.33"
+mysql_async = { version = "0.33", default-features = false, features = ["minimal"] }
 mysql-binlog-connector-rust = { git = "https://github.com/jakubkulhan/mysql-binlog-connector-rust", branch = "table-metadata" }
-tokio = { version = "1.0", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-anyhow = "1.0"
-log = "0.4"
+tokio = { version = "1.0", default-features = false, features = ["rt", "net", "io-util"] }
 url = "2.5"
 rand = "0.8"
 base64 = "0.22"
-libc = "0.2"
 
 [profile.release]
 strip = "debuginfo"
