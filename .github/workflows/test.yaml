@@ -66,7 +66,7 @@ jobs:
           php-version: '8.4'
       - name: Install Composer dependencies
         working-directory: ./data-access-kit-replication
-        run: composer install --no-dev
+        run: composer install
       - name: Run unit tests
         working-directory: ./data-access-kit-replication
         run: composer run test:unit
@@ -102,7 +102,7 @@ jobs:
           php-version: '8.4'
       - name: Install Composer dependencies
         working-directory: ./data-access-kit-replication
-        run: composer install --no-dev
+        run: composer install
       - name: Run database tests
         working-directory: ./data-access-kit-replication
         run: composer run test:database:env
