@@ -1,3 +1,4 @@
+name: Split & Push
 on:
   push:
     branches:
