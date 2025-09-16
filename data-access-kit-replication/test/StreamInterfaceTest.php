@@ -10,7 +10,7 @@ use DataAccessKit\Replication\StreamFilterInterface;
 use Exception;
 
 #[Group("unit")]
-class StreamTest extends TestCase
+class StreamInterfaceTest extends TestCase
 {
     public function testStreamClassExists(): void
     {
