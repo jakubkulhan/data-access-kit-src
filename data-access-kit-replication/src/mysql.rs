@@ -16,6 +16,17 @@ use mysql_binlog_connector_rust::{
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::LazyLock;
+use tokio::runtime::Runtime;
+
+macro_rules! with_runtime_block_on {
+    ($self:ident, $async_block:expr) => {{
+        $self.ensure_runtime()?;
+        let runtime = $self.runtime.take().unwrap();
+        let result = runtime.block_on($async_block);
+        $self.runtime = Some(runtime);
+        result
+    }};
+}
 
 
 static NEXT_SERVER_ID: LazyLock<AtomicU32> = LazyLock::new(|| {
@@ -48,6 +59,7 @@ pub struct MySQLStreamDriver {
     table_map: std::collections::HashMap<u64, TableMapEvent>,
     checkpointer: Option<Checkpointer>,
     filter: Option<Filter>,
+    runtime: Option<Runtime>,
 }
 
 impl std::fmt::Debug for MySQLStreamDriver {
@@ -98,8 +110,21 @@ impl MySQLStreamDriver {
             table_map: std::collections::HashMap::new(),
             checkpointer: None,
             filter: None,
+            runtime: None,
         }
     }
+
+    fn ensure_runtime(&mut self) -> PhpResult<()> {
+        if self.runtime.is_none() {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
+            self.runtime = Some(rt);
+        }
+        Ok(())
+    }
+
 
     async fn validate_mysql_config(&mut self, pool: &Pool) -> Result<(), String> {
         let mut conn = pool.get_conn().await
@@ -389,11 +414,7 @@ impl MySQLStreamDriver {
     }
     
     fn fetch_next_event(&mut self) -> PhpResult<()> {
-        // Create a runtime for async operations
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
-
-        rt.block_on(async {
+        with_runtime_block_on!(self, async {
             if let Some(ref mut stream) = self.binlog_stream {
                 loop {
                     // Read next event from binlog stream
@@ -454,7 +475,7 @@ impl MySQLStreamDriver {
                             // Skip if no table map found
                             continue;
                         },
-                        
+
                         EventData::UpdateRows(update_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&update_rows_event.table_id) {
                                 // Check filter before processing
@@ -492,7 +513,7 @@ impl MySQLStreamDriver {
                             // Skip if no table map found
                             continue;
                         },
-                        
+
                         EventData::DeleteRows(delete_rows_event) => {
                             if let Some(table_map) = self.table_map.get(&delete_rows_event.table_id) {
                                 // Check filter before processing
@@ -773,11 +794,7 @@ impl StreamDriver for MySQLStreamDriver {
             return Ok(());
         }
 
-        // Create a Tokio runtime for async operations
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
-
-        rt.block_on(async {
+        with_runtime_block_on!(self, async {
             // Build MySQL connection options
             // For replication, we don't connect to a specific database
             // The replication user needs REPLICATION SLAVE/CLIENT privileges, not database access
@@ -841,6 +858,7 @@ impl StreamDriver for MySQLStreamDriver {
         self.table_map.clear();
         self.checkpointer = None;
         self.filter = None;
+        self.runtime = None;
         
         Ok(())
     }
@@ -906,10 +924,7 @@ impl StreamDriver for MySQLStreamDriver {
         self.load_checkpoint_if_available()?;
 
         // Initialize binlog client with checkpoint position (async)
-        let rt = tokio::runtime::Runtime::new()
-            .map_err(|e| PhpException::default(format!("Failed to create Tokio runtime: {}", e).into()))?;
-
-        rt.block_on(async {
+        with_runtime_block_on!(self, async {
             self.initialize_binlog_client().await
         })?;
 
