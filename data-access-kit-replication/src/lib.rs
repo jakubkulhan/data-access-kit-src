@@ -15,10 +15,10 @@ use filter::Filter;
 
 static INTERFACES_INIT: Once = Once::new();
 
-trait StreamDriver: std::fmt::Debug {
+trait StreamDriver {
     fn connect(&mut self) -> PhpResult<()>;
     fn disconnect(&mut self) -> PhpResult<()>;
-    fn set_checkpointer(&mut self, checkpointer: Option<Checkpointer>) -> PhpResult<()>;
+    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()>;
     fn set_filter(&mut self, filter: &Zval) -> PhpResult<()>;
     fn current(&self) -> PhpResult<Option<Zval>>;
     fn key(&self) -> PhpResult<i32>;
@@ -30,10 +30,8 @@ trait StreamDriver: std::fmt::Debug {
 #[php_class]
 #[php(name = "DataAccessKit\\Replication\\Stream")]
 #[php(implements(ce = ce::iterator, stub = "Iterator"))]
-#[derive(Debug)]
 pub struct Stream {
     driver: Box<dyn StreamDriver>,
-    position: u64,
 }
 
 impl Stream {
@@ -57,12 +55,7 @@ impl Stream {
                         let password = url.password()
                             .unwrap_or("")
                             .to_string();
-                        
-                        let database = url.path()
-                            .strip_prefix('/')
-                            .filter(|s| !s.is_empty())
-                            .map(|s| s.to_string());
-                        
+
                         let server_id = url.query_pairs()
                             .find(|(key, _)| key == "server_id")
                             .and_then(|(_, value)| value.parse::<u32>().ok());
@@ -72,7 +65,6 @@ impl Stream {
                             port,
                             user,
                             password,
-                            database,
                             server_id,
                         )))
                     },
@@ -90,7 +82,6 @@ impl Stream {
         let driver = Self::create_driver(&connection_url)?;
         Ok(Stream {
             driver,
-            position: 0,
         })
     }
 
@@ -103,13 +94,7 @@ impl Stream {
     }
 
     pub fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
-        let wrapper = if checkpointer.is_null() {
-            None
-        } else {
-            Some(Checkpointer::new(checkpointer)?)
-        };
-
-        self.driver.set_checkpointer(wrapper)
+        self.driver.set_checkpointer(checkpointer)
     }
 
     pub fn set_filter(&mut self, filter: &Zval) -> PhpResult<()> {
@@ -126,12 +111,10 @@ impl Stream {
     }
 
     pub fn next(&mut self) -> PhpResult<()> {
-        self.position += 1;
         self.driver.next()
     }
 
     pub fn rewind(&mut self) -> PhpResult<()> {
-        self.position = 0;
         self.driver.rewind()
     }
 
@@ -140,10 +123,6 @@ impl Stream {
     }
 }
 
-unsafe extern "C" fn startup_function(_type: i32, _module_number: i32) -> i32 {
-    // Module startup - just return success, actual loading happens in request startup
-    0 // SUCCESS
-}
 
 unsafe extern "C" fn request_startup_function(_type: i32, _module_number: i32) -> i32 {
     // Use Once to ensure interfaces are only loaded once per process
@@ -189,6 +168,5 @@ unsafe extern "C" fn request_startup_function(_type: i32, _module_number: i32) -
 pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
     module
         .class::<Stream>()
-        .startup_function(startup_function)
         .request_startup_function(request_startup_function)
 }

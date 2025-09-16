@@ -42,7 +42,6 @@ pub struct MySQLStreamDriver {
     port: u16,
     user: String,
     password: String,
-    database: Option<String>,
     server_id: Option<u32>,
     position: u64,
     pool: Option<Pool>,
@@ -62,21 +61,6 @@ pub struct MySQLStreamDriver {
     runtime: Option<Runtime>,
 }
 
-impl std::fmt::Debug for MySQLStreamDriver {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MySQLStreamDriver")
-            .field("host", &self.host)
-            .field("port", &self.port)
-            .field("user", &self.user)
-            .field("database", &self.database)
-            .field("server_id", &self.server_id)
-            .field("position", &self.position)
-            .field("is_mariadb", &self.is_mariadb)
-            .field("use_gtid_checkpoints", &self.use_gtid_checkpoints)
-            .field("connected", &self.connected)
-            .finish()
-    }
-}
 
 impl MySQLStreamDriver {
 
@@ -85,7 +69,6 @@ impl MySQLStreamDriver {
         port: u16,
         user: String,
         password: String,
-        database: Option<String>,
         server_id: Option<u32>,
     ) -> Self {
         MySQLStreamDriver {
@@ -93,7 +76,6 @@ impl MySQLStreamDriver {
             port,
             user: user.clone(),
             password,
-            database,
             server_id,
             position: 0,
             pool: None,
@@ -863,8 +845,14 @@ impl StreamDriver for MySQLStreamDriver {
         Ok(())
     }
 
-    fn set_checkpointer(&mut self, checkpointer: Option<Checkpointer>) -> PhpResult<()> {
-        self.checkpointer = checkpointer;
+    fn set_checkpointer(&mut self, checkpointer: &Zval) -> PhpResult<()> {
+        let wrapper = if checkpointer.is_null() {
+            None
+        } else {
+            Some(Checkpointer::new(checkpointer)?)
+        };
+
+        self.checkpointer = wrapper;
         Ok(())
     }
 
