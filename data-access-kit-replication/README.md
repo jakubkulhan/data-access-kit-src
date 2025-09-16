@@ -63,7 +63,15 @@ cd data-access-kit-replication
 cargo build --release
 
 # Install the extension using cargo-php
-cargo php install
+cargo php install --release --yes
+```
+
+### Remove Extension
+
+To uninstall the extension:
+
+```bash
+cargo php remove --yes
 ```
 
 ## Usage
