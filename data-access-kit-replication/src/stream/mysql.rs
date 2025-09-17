@@ -1,7 +1,8 @@
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
 use ext_php_rs::zend;
-use crate::{StreamDriver, Checkpointer, Filter};
+use super::StreamDriver;
+use crate::{Checkpointer, Filter};
 use mysql_async::{Pool, OptsBuilder};
 use mysql_binlog_connector_rust::{
     binlog_client::BinlogClient,
