@@ -286,17 +286,17 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
             ['BINARY(5)', 'X\'48656c6c6f\'', 'Hello', null], // Use hex notation for binary data
             ['VARBINARY(10)', 'X\'48656c6c6f\'', 'Hello', null], // Use hex notation for binary data
 
-            // Text Types - these are base64 encoded in binlog
-            ['TINYTEXT', '\'Tiny text\'', 'VGlueSB0ZXh0', null],
-            ['TEXT', '\'Regular text content\'', 'UmVndWxhciB0ZXh0IGNvbnRlbnQ=', null],
-            ['MEDIUMTEXT', '\'Medium text content\'', 'TWVkaXVtIHRleHQgY29udGVudA==', null],
-            ['LONGTEXT', '\'Long text content\'', 'TG9uZyB0ZXh0IGNvbnRlbnQ=', null],
+            // Text Types - now returned as UTF-8 strings
+            ['TINYTEXT', '\'Tiny text\'', 'Tiny text', null],
+            ['TEXT', '\'Regular text content\'', 'Regular text content', null],
+            ['MEDIUMTEXT', '\'Medium text content\'', 'Medium text content', null],
+            ['LONGTEXT', '\'Long text content\'', 'Long text content', null],
 
-            // Binary Large Object Types - these are base64 encoded in binlog
-            ['TINYBLOB', 'X\'48656c6c6f\'', 'SGVsbG8=', null], // "Hello" in base64
-            ['BLOB', 'X\'48656c6c6f20576f726c64\'', 'SGVsbG8gV29ybGQ=', null], // "Hello World" in base64
-            ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'SGVsbG8gTWVkaXVt', null], // "Hello Medium" in base64
-            ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'SGVsbG8gTG9uZw==', null], // "Hello Long" in base64
+            // Binary Large Object Types - now returned as raw binary data
+            ['TINYBLOB', 'X\'48656c6c6f\'', 'Hello', null], // "Hello" from hex
+            ['BLOB', 'X\'48656c6c6f20576f726c64\'', 'Hello World', null], // "Hello World" from hex
+            ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'Hello Medium', null], // "Hello Medium" from hex
+            ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'Hello Long', null], // "Hello Long" from hex
 
             // Special String Types - now return actual string values with fix-enum-set-metadata branch
             ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 'red', null], // ENUM returns actual string value
@@ -311,8 +311,8 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
 
             // JSON Data Type - MySQL returns parsed stdClass objects
             ['JSON', '\'{"key": "value", "number": 42}\'', (object)['key' => 'value', 'number' => 42], 'mysql'],
-            // JSON Data Type - MariaDB returns base64 encoded strings
-            ['JSON', '\'{"key": "value", "number": 42}\'', 'eyJrZXkiOiAidmFsdWUiLCAibnVtYmVyIjogNDJ9', 'mariadb'],
+            // JSON Data Type - MariaDB returns JSON string (not parsed)
+            ['JSON', '\'{"key": "value", "number": 42}\'', '{"key": "value", "number": 42}', 'mariadb'],
 
             // NULL values for various types
             ['VARCHAR(50)', 'NULL', null, null],

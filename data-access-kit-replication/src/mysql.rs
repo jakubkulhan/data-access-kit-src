@@ -698,11 +698,8 @@ impl MySQLStreamDriver {
                 }
             },
             ColumnValue::Blob(bytes) => {
-                // Encode binary data as base64
-                use base64::Engine;
-                let engine = base64::engine::general_purpose::STANDARD;
-                let encoded = engine.encode(bytes);
-                zval.set_string(&encoded, false)?;
+                // Set raw binary data directly to PHP
+                zval.set_binary(bytes.clone());
             },
             ColumnValue::Json(bytes) => {
                 // Try to parse as JSON string and then parse to PHP objects/arrays
