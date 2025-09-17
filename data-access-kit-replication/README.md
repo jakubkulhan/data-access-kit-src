@@ -10,7 +10,7 @@ Start by creating a replication stream to capture database changes in real-time.
 use DataAccessKit\Replication\Stream;
 
 // Connect to MySQL replication stream
-$stream = new Stream('mysql://replication_user:password@localhost:3306?server_id=100');
+$stream = new Stream('mysql://user:password@localhost:3306');
 
 // Process events as they occur
 foreach ($stream as $event) {
@@ -84,7 +84,7 @@ Initialize a stream to connect to the MySQL replication log:
 use DataAccessKit\Replication\Stream;
 
 // Create stream with connection URL
-$stream = new Stream('mysql://replication_user:password@localhost:3306?server_id=100');
+$stream = new Stream('mysql://user:password@localhost:3306');
 
 // Start iterating over events
 foreach ($stream as $event) {
@@ -96,14 +96,14 @@ foreach ($stream as $event) {
 Connection URL formats:
 
 ```php
-// MySQL (port 32016 when using docker-compose)
-$url = 'mysql://root@localhost:32016?server_id=100';
+// MySQL/MariaDB (user only)
+$url = 'mysql://user@localhost:3306';
 
-// MariaDB (port 35098 when using docker-compose)
-$url = 'mysql://root@localhost:35098?server_id=100';
+// MySQL/MariaDB (user and password)
+$url = 'mysql://user:password@localhost:3306';
 
-// With authentication
-$url = 'mysql://user:password@localhost:3306?server_id=100';
+// MySQL/MariaDB (explicitly specify server ID)
+$url = 'mysql://user:password@localhost:3306?server_id=123';
 ```
 
 ### Events
@@ -211,7 +211,7 @@ foreach ($stream as $event) {
 }
 ```
 
-For production systems, use database-based checkpointing:
+For production systems, you'll probably want to use something like database-based checkpointing:
 
 ```php
 class DatabaseCheckpointer implements StreamCheckpointerInterface {
