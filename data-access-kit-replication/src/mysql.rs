@@ -714,7 +714,7 @@ impl MySQLStreamDriver {
                 zval.set_long(*value as i64);
             },
             ColumnValue::Set(value) => {
-                // Convert SET bitmask to string values using column metadata
+                // Convert SET bitmask to array of string values using column metadata
                 if let Some(metadata) = column_metadata {
                     if let Some(ref set_values) = metadata.set_string_values {
                         let mut selected_values = Vec::new();
@@ -727,8 +727,27 @@ impl MySQLStreamDriver {
                             }
                         }
 
-                        let result_string = selected_values.join(",");
-                        zval.set_string(&result_string, false)?;
+                        // Create PHP array instead of comma-separated string
+                        let zvals: Result<Vec<Zval>, PhpException> = selected_values.iter().map(|value| {
+                            let mut element = Zval::new();
+                            element.set_string(value, false)?;
+                            Ok(element)
+                        }).collect();
+
+                        match zvals {
+                            Ok(array_zvals) => {
+                                if let Err(_) = zval.set_array(array_zvals) {
+                                    // Fallback to comma-separated string on array error
+                                    let result_string = selected_values.join(",");
+                                    zval.set_string(&result_string, false)?;
+                                }
+                            }
+                            Err(_) => {
+                                // Fallback to comma-separated string on error
+                                let result_string = selected_values.join(",");
+                                zval.set_string(&result_string, false)?;
+                            }
+                        }
                     } else {
                         // Fallback to numeric value if no metadata
                         zval.set_long(*value as i64);

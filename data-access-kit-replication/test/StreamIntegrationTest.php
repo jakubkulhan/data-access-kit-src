@@ -298,9 +298,9 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
             ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'SGVsbG8gTWVkaXVt'], // "Hello Medium" in base64
             ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'SGVsbG8gTG9uZw=='], // "Hello Long" in base64
 
-            // Special String Types - these return numeric values due to binlog limitations
-            ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 1], // ENUM returns 1-based index (string values not available in binlog metadata)
-            ['SET(\'read\',\'write\',\'execute\')', '\'read,write\'', 3], // SET returns bitmask (string values not available in binlog metadata)
+            // Special String Types - now return actual string values with fix-enum-set-metadata branch
+            ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 'red'], // ENUM returns actual string value
+            ['SET(\'read\',\'write\',\'execute\')', '\'read,write\'', ['read', 'write']], // SET returns array of strings
 
             // Date and Time Data Types
             ['DATE', '\'2024-01-15\'', '2024-01-15'],
