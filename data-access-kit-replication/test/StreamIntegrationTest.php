@@ -258,87 +258,101 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
     {
         return [
             // Integer Types
-            ['TINYINT', 127, 127],
-            ['TINYINT UNSIGNED', 255, -1], // MySQL binlog represents max unsigned as -1
-            ['SMALLINT', 32767, 32767],
-            ['SMALLINT UNSIGNED', 65535, -1], // MySQL binlog represents max unsigned as -1
-            ['MEDIUMINT', 8388607, 8388607],
-            ['MEDIUMINT UNSIGNED', 16777215, -1], // MySQL binlog represents max unsigned as -1
-            ['INT', 2147483647, 2147483647],
-            ['INT UNSIGNED', 4294967295, -1], // MySQL binlog represents max unsigned as -1
-            ['BIGINT', '9223372036854775807', '9223372036854775807'],
-            ['BIGINT UNSIGNED', '18446744073709551615', -1], // MySQL binlog represents max unsigned as -1
-            ['BIT(8)', 'b\'11111111\'', 255],
-            ['BIT(1)', 'b\'1\'', 1],
+            ['TINYINT', 127, 127, null],
+            ['TINYINT UNSIGNED', 255, -1, null], // MySQL binlog represents max unsigned as -1
+            ['SMALLINT', 32767, 32767, null],
+            ['SMALLINT UNSIGNED', 65535, -1, null], // MySQL binlog represents max unsigned as -1
+            ['MEDIUMINT', 8388607, 8388607, null],
+            ['MEDIUMINT UNSIGNED', 16777215, -1, null], // MySQL binlog represents max unsigned as -1
+            ['INT', 2147483647, 2147483647, null],
+            ['INT UNSIGNED', 4294967295, -1, null], // MySQL binlog represents max unsigned as -1
+            ['BIGINT', '9223372036854775807', '9223372036854775807', null],
+            ['BIGINT UNSIGNED', '18446744073709551615', -1, null], // MySQL binlog represents max unsigned as -1
+            ['BIT(8)', 'b\'11111111\'', 255, null],
+            ['BIT(1)', 'b\'1\'', 1, null],
 
             // Fixed-Point Types
-            ['DECIMAL(10,2)', '123.45', '123.45'],
-            ['DECIMAL(5,0)', '12345', '12345'],
-            ['NUMERIC(8,3)', '12345.678', '12345.678'],
+            ['DECIMAL(10,2)', '123.45', '123.45', null],
+            ['DECIMAL(5,0)', '12345', '12345', null],
+            ['NUMERIC(8,3)', '12345.678', '12345.678', null],
 
             // Floating-Point Types
-            ['FLOAT', 123.456, 123.456],
-            ['DOUBLE', 123.456789, 123.456789],
+            ['FLOAT', 123.456, 123.456, null],
+            ['DOUBLE', 123.456789, 123.456789, null],
 
             // Character Types
-            ['CHAR(10)', '\'Hello\'', 'Hello'],
-            ['VARCHAR(50)', '\'Variable length\'', 'Variable length'],
-            ['BINARY(5)', 'X\'48656c6c6f\'', 'Hello'], // Use hex notation for binary data
-            ['VARBINARY(10)', 'X\'48656c6c6f\'', 'Hello'], // Use hex notation for binary data
+            ['CHAR(10)', '\'Hello\'', 'Hello', null],
+            ['VARCHAR(50)', '\'Variable length\'', 'Variable length', null],
+            ['BINARY(5)', 'X\'48656c6c6f\'', 'Hello', null], // Use hex notation for binary data
+            ['VARBINARY(10)', 'X\'48656c6c6f\'', 'Hello', null], // Use hex notation for binary data
 
             // Text Types - these are base64 encoded in binlog
-            ['TINYTEXT', '\'Tiny text\'', 'VGlueSB0ZXh0'],
-            ['TEXT', '\'Regular text content\'', 'UmVndWxhciB0ZXh0IGNvbnRlbnQ='],
-            ['MEDIUMTEXT', '\'Medium text content\'', 'TWVkaXVtIHRleHQgY29udGVudA=='],
-            ['LONGTEXT', '\'Long text content\'', 'TG9uZyB0ZXh0IGNvbnRlbnQ='],
+            ['TINYTEXT', '\'Tiny text\'', 'VGlueSB0ZXh0', null],
+            ['TEXT', '\'Regular text content\'', 'UmVndWxhciB0ZXh0IGNvbnRlbnQ=', null],
+            ['MEDIUMTEXT', '\'Medium text content\'', 'TWVkaXVtIHRleHQgY29udGVudA==', null],
+            ['LONGTEXT', '\'Long text content\'', 'TG9uZyB0ZXh0IGNvbnRlbnQ=', null],
 
             // Binary Large Object Types - these are base64 encoded in binlog
-            ['TINYBLOB', 'X\'48656c6c6f\'', 'SGVsbG8='], // "Hello" in base64
-            ['BLOB', 'X\'48656c6c6f20576f726c64\'', 'SGVsbG8gV29ybGQ='], // "Hello World" in base64
-            ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'SGVsbG8gTWVkaXVt'], // "Hello Medium" in base64
-            ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'SGVsbG8gTG9uZw=='], // "Hello Long" in base64
+            ['TINYBLOB', 'X\'48656c6c6f\'', 'SGVsbG8=', null], // "Hello" in base64
+            ['BLOB', 'X\'48656c6c6f20576f726c64\'', 'SGVsbG8gV29ybGQ=', null], // "Hello World" in base64
+            ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'SGVsbG8gTWVkaXVt', null], // "Hello Medium" in base64
+            ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'SGVsbG8gTG9uZw==', null], // "Hello Long" in base64
 
             // Special String Types - now return actual string values with fix-enum-set-metadata branch
-            ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 'red'], // ENUM returns actual string value
-            ['SET(\'read\',\'write\',\'execute\')', '\'read,write\'', ['read', 'write']], // SET returns array of strings
+            ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 'red', null], // ENUM returns actual string value
+            ['SET(\'read\',\'write\',\'execute\')', '\'read,write\'', ['read', 'write'], null], // SET returns array of strings
 
             // Date and Time Data Types
-            ['DATE', '\'2024-01-15\'', '2024-01-15'],
-            ['TIME', '\'14:30:45\'', '14:30:45.000000'], // TIME includes microseconds
-            ['DATETIME', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45.000000')], // DATETIME as DateTimeImmutable
-            ['TIMESTAMP', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45')], // TIMESTAMP as DateTimeImmutable
-            ['YEAR', '2024', '2024'],
+            ['DATE', '\'2024-01-15\'', '2024-01-15', null],
+            ['TIME', '\'14:30:45\'', '14:30:45.000000', null], // TIME includes microseconds
+            ['DATETIME', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45.000000'), null], // DATETIME as DateTimeImmutable
+            ['TIMESTAMP', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45'), null], // TIMESTAMP as DateTimeImmutable
+            ['YEAR', '2024', '2024', null],
 
-            // JSON Data Type - now returns parsed stdClass objects
-            ['JSON', '\'{"key": "value", "number": 42}\'', (object)['key' => 'value', 'number' => 42]],
+            // JSON Data Type - MySQL returns parsed stdClass objects
+            ['JSON', '\'{"key": "value", "number": 42}\'', (object)['key' => 'value', 'number' => 42], 'mysql'],
+            // JSON Data Type - MariaDB returns base64 encoded strings
+            ['JSON', '\'{"key": "value", "number": 42}\'', 'eyJrZXkiOiAidmFsdWUiLCAibnVtYmVyIjogNDJ9', 'mariadb'],
 
             // NULL values for various types
-            ['VARCHAR(50)', 'NULL', null],
-            ['INT', 'NULL', null],
-            ['DATE', 'NULL', null],
-            ['JSON', 'NULL', null],
+            ['VARCHAR(50)', 'NULL', null, null],
+            ['INT', 'NULL', null, null],
+            ['DATE', 'NULL', null, null],
+            ['JSON', 'NULL', null, null],
 
             // Zero and empty values
-            ['INT', '0', 0],
-            ['VARCHAR(50)', '\'\'', ''],
-            ['TEXT', '\'\'', ''],
+            ['INT', '0', 0, null],
+            ['VARCHAR(50)', '\'\'', '', null],
+            ['TEXT', '\'\'', '', null],
 
             // Negative numbers
-            ['TINYINT', '-128', -128],
-            ['SMALLINT', '-32768', -32768],
-            ['MEDIUMINT', '-8388608', -8388608],
-            ['INT', '-2147483648', -2147483648],
-            ['BIGINT', '-9223372036854775808', '-9223372036854775808'],
-            ['DECIMAL(10,2)', '-123.45', '-123.45'],
-            ['FLOAT', '-123.456', -123.456],
-            ['DOUBLE', '-123.456789', -123.456789],
+            ['TINYINT', '-128', -128, null],
+            ['SMALLINT', '-32768', -32768, null],
+            ['MEDIUMINT', '-8388608', -8388608, null],
+            ['INT', '-2147483648', -2147483648, null],
+            ['BIGINT', '-9223372036854775808', '-9223372036854775808', null],
+            ['DECIMAL(10,2)', '-123.45', '-123.45', null],
+            ['FLOAT', '-123.456', -123.456, null],
+            ['DOUBLE', '-123.456789', -123.456789, null],
         ];
     }
 
     #[DataProvider('dataTypeProvider')]
-    public function testDataTypeConversion(string $columnType, $insertValue, $expectedPhpValue): void
+    public function testDataTypeConversion(string $columnType, $insertValue, $expectedPhpValue, ?string $databaseFlavor): void
     {
         $this->requireDatabase();
+
+        // Skip test if database flavor doesn't match
+        if ($databaseFlavor !== null) {
+            $stmt = $this->pdo->query("SELECT VERSION()");
+            $version = $stmt->fetchColumn();
+            $isMariaDB = stripos($version, 'mariadb') !== false;
+
+            if (($databaseFlavor === 'mariadb' && !$isMariaDB) ||
+                ($databaseFlavor === 'mysql' && $isMariaDB)) {
+                $this->markTestSkipped("Test only runs on {$databaseFlavor}");
+            }
+        }
 
         $stream = null;
         $testTableName = 'test_data_types_' . md5($columnType . serialize($insertValue));
@@ -352,11 +366,6 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
                 $this->dbConfig['user'],
                 $this->dbConfig['password']
             );
-
-            // Detect database type
-            $stmt = $testPdo->query("SELECT VERSION()");
-            $version = $stmt->fetchColumn();
-            $isMariaDB = stripos($version, 'mariadb') !== false;
 
             $createTableSql = "CREATE TABLE IF NOT EXISTS `{$testTableName}` (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -383,12 +392,8 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
             $this->assertEquals($testTableName, $insertEvent->table);
             $this->assertIsObject($insertEvent->after);
 
-            // Adjust expectations for MariaDB JSON handling
+            // Use expected value as-is since database flavor filtering handles different expectations
             $actualExpectedValue = $expectedPhpValue;
-            if ($isMariaDB && strpos($columnType, 'JSON') === 0 && is_object($expectedPhpValue) && get_class($expectedPhpValue) === 'stdClass') {
-                // MariaDB returns JSON as base64 encoded string, not parsed object
-                $actualExpectedValue = 'eyJrZXkiOiAidmFsdWUiLCAibnVtYmVyIjogNDJ9'; // Base64 encoded
-            }
 
             if ($actualExpectedValue === null) {
                 $this->assertNull($insertEvent->after->test_column);
