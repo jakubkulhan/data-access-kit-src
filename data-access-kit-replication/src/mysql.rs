@@ -705,9 +705,9 @@ impl MySQLStreamDriver {
                 zval.set_string(&encoded, false)?;
             },
             ColumnValue::Json(bytes) => {
-                // Try to parse as JSON string
+                // Try to parse as JSON string and then parse to PHP objects/arrays
                 if let Ok(json_str) = mysql_binlog_connector_rust::column::json::json_binary::JsonBinary::parse_as_string(bytes) {
-                    zval.set_string(&json_str, false)?;
+                    self.parse_json_to_php(&mut zval, &json_str)?;
                 } else {
                     // Fall back to base64 encoding
                     use base64::Engine;
@@ -824,6 +824,80 @@ impl MySQLStreamDriver {
 
         // Set the object in the zval
         zval.set_object(&mut *datetime_obj.into_raw());
+        Ok(())
+    }
+
+    fn parse_json_to_php(&self, zval: &mut Zval, json_str: &str) -> PhpResult<()> {
+        // Use serde_json to parse the JSON string to a Rust value first
+        match serde_json::from_str::<serde_json::Value>(json_str) {
+            Ok(json_value) => {
+                self.json_value_to_zval(&mut *zval, &json_value)?;
+                Ok(())
+            }
+            Err(_) => {
+                // If JSON parsing fails, fall back to setting as string
+                zval.set_string(json_str, false)?;
+                Ok(())
+            }
+        }
+    }
+
+    fn json_value_to_zval(&self, zval: &mut Zval, json_value: &serde_json::Value) -> PhpResult<()> {
+        match json_value {
+            serde_json::Value::Null => {
+                zval.set_null();
+            }
+            serde_json::Value::Bool(b) => {
+                zval.set_bool(*b);
+            }
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    zval.set_long(i);
+                } else if let Some(f) = n.as_f64() {
+                    zval.set_double(f);
+                } else {
+                    // Fallback to string representation
+                    zval.set_string(&n.to_string(), false)?;
+                }
+            }
+            serde_json::Value::String(s) => {
+                zval.set_string(s, false)?;
+            }
+            serde_json::Value::Array(arr) => {
+                let zvals: Result<Vec<Zval>, PhpException> = arr.iter().map(|item| {
+                    let mut element = Zval::new();
+                    self.json_value_to_zval(&mut element, item)?;
+                    Ok(element)
+                }).collect();
+
+                match zvals {
+                    Ok(array_zvals) => {
+                        if let Err(_) = zval.set_array(array_zvals) {
+                            // Fallback to empty array on error
+                            let _ = zval.set_array(Vec::<Zval>::new());
+                        }
+                    }
+                    Err(_) => {
+                        // Fallback to empty array on error
+                        let _ = zval.set_array(Vec::<Zval>::new());
+                    }
+                }
+            }
+            serde_json::Value::Object(obj) => {
+                // Create stdClass object
+                let stdclass_ce = zend::ClassEntry::try_find("stdClass")
+                    .ok_or_else(|| PhpException::default("stdClass not found".into()))?;
+                let mut obj_zend = ext_php_rs::types::ZendObject::new(stdclass_ce);
+
+                for (key, value) in obj {
+                    let mut prop_zval = Zval::new();
+                    self.json_value_to_zval(&mut prop_zval, value)?;
+                    obj_zend.set_property(key, prop_zval)?;
+                }
+
+                zval.set_object(&mut *obj_zend.into_raw());
+            }
+        }
         Ok(())
     }
 

@@ -309,8 +309,8 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
             ['TIMESTAMP', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45')], // TIMESTAMP as DateTimeImmutable
             ['YEAR', '2024', '2024'],
 
-            // JSON Data Type - formatting may change
-            ['JSON', '\'{"key": "value", "number": 42}\'', '{"key":"value","number":42}'],
+            // JSON Data Type - now returns parsed stdClass objects
+            ['JSON', '\'{"key": "value", "number": 42}\'', (object)['key' => 'value', 'number' => 42]],
 
             // NULL values for various types
             ['VARCHAR(50)', 'NULL', null],
@@ -385,7 +385,8 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
 
             // Adjust expectations for MariaDB JSON handling
             $actualExpectedValue = $expectedPhpValue;
-            if ($isMariaDB && strpos($columnType, 'JSON') === 0 && $expectedPhpValue === '{"key":"value","number":42}') {
+            if ($isMariaDB && strpos($columnType, 'JSON') === 0 && is_object($expectedPhpValue) && get_class($expectedPhpValue) === 'stdClass') {
+                // MariaDB returns JSON as base64 encoded string, not parsed object
                 $actualExpectedValue = 'eyJrZXkiOiAidmFsdWUiLCAibnVtYmVyIjogNDJ9'; // Base64 encoded
             }
 
@@ -398,6 +399,9 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
                 $this->assertEquals($actualExpectedValue->getTimestamp(), $insertEvent->after->test_column->getTimestamp());
                 // Additional checks for DateTimeImmutable
                 $this->assertEquals($actualExpectedValue->format('Y-m-d H:i:s'), $insertEvent->after->test_column->format('Y-m-d H:i:s'));
+            } elseif (is_object($actualExpectedValue) && get_class($actualExpectedValue) === 'stdClass') {
+                $this->assertInstanceOf(\stdClass::class, $insertEvent->after->test_column);
+                $this->assertEquals($actualExpectedValue, $insertEvent->after->test_column);
             } else {
                 $this->assertEquals($actualExpectedValue, $insertEvent->after->test_column);
             }

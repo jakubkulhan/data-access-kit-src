@@ -666,6 +666,7 @@ dependencies = [
  "mysql-binlog-connector-rust",
  "mysql_async",
  "rand",
+ "serde_json",
  "tokio",
  "url",
 ]
