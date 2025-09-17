@@ -675,9 +675,15 @@ impl MySQLStreamDriver {
             ColumnValue::Double(d) => zval.set_double(*d),
             ColumnValue::Decimal(d) => zval.set_string(d, false)?,
             ColumnValue::Date(date) => zval.set_string(date, false)?,
-            ColumnValue::DateTime(dt) => zval.set_string(dt, false)?,
+            ColumnValue::DateTime(dt) => {
+                // Create DateTimeImmutable instance from datetime string
+                self.create_datetime_immutable(&mut zval, dt)?;
+            },
             ColumnValue::Time(t) => zval.set_string(t, false)?,
-            ColumnValue::Timestamp(ts) => zval.set_long(*ts),
+            ColumnValue::Timestamp(ts) => {
+                // Create DateTimeImmutable instance from timestamp microseconds
+                self.create_datetime_immutable_from_timestamp(&mut zval, *ts)?;
+            },
             ColumnValue::Year(y) => zval.set_long(*y as i64),
             ColumnValue::String(bytes) => {
                 // Convert Vec<u8> to string, assuming UTF-8
@@ -782,8 +788,46 @@ impl MySQLStreamDriver {
 
         Ok(zval)
     }
-    
-    
+
+    fn create_datetime_immutable(&self, zval: &mut Zval, datetime_str: &str) -> PhpResult<()> {
+        // Find DateTimeImmutable class
+        let datetime_ce = zend::ClassEntry::try_find("DateTimeImmutable")
+            .ok_or_else(|| PhpException::default("DateTimeImmutable class not found".into()))?;
+
+        // Create DateTimeImmutable object
+        let datetime_obj = ext_php_rs::types::ZendObject::new(datetime_ce);
+
+        // Call constructor with datetime string
+        let _result = datetime_obj.try_call_method("__construct", vec![&datetime_str])?;
+
+        // Set the object in the zval
+        zval.set_object(&mut *datetime_obj.into_raw());
+        Ok(())
+    }
+
+    fn create_datetime_immutable_from_timestamp(&self, zval: &mut Zval, timestamp_micros: i64) -> PhpResult<()> {
+        // Convert microseconds to seconds
+        let timestamp_seconds = timestamp_micros / 1_000_000;
+
+        // Create a timestamp string in format that DateTimeImmutable constructor accepts
+        let timestamp_str = format!("@{}", timestamp_seconds);
+
+        // Find DateTimeImmutable class
+        let datetime_ce = zend::ClassEntry::try_find("DateTimeImmutable")
+            .ok_or_else(|| PhpException::default("DateTimeImmutable class not found".into()))?;
+
+        // Create DateTimeImmutable object with timestamp string
+        let datetime_obj = ext_php_rs::types::ZendObject::new(datetime_ce);
+
+        // Call constructor with timestamp string (format: @1234567890)
+        let _result = datetime_obj.try_call_method("__construct", vec![&timestamp_str])?;
+
+        // Set the object in the zval
+        zval.set_object(&mut *datetime_obj.into_raw());
+        Ok(())
+    }
+
+
     fn create_event(
         &self, 
         class_name: &str, 

@@ -305,8 +305,8 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
             // Date and Time Data Types
             ['DATE', '\'2024-01-15\'', '2024-01-15'],
             ['TIME', '\'14:30:45\'', '14:30:45.000000'], // TIME includes microseconds
-            ['DATETIME', '\'2024-01-15 14:30:45\'', '2024-01-15 14:30:45.000000'], // DATETIME includes microseconds
-            ['TIMESTAMP', '\'2024-01-15 14:30:45\'', 1705329045000000], // TIMESTAMP as microseconds since epoch
+            ['DATETIME', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45.000000')], // DATETIME as DateTimeImmutable
+            ['TIMESTAMP', '\'2024-01-15 14:30:45\'', new \DateTimeImmutable('2024-01-15 14:30:45')], // TIMESTAMP as DateTimeImmutable
             ['YEAR', '2024', '2024'],
 
             // JSON Data Type - formatting may change
@@ -393,6 +393,11 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
                 $this->assertNull($insertEvent->after->test_column);
             } elseif (is_float($actualExpectedValue)) {
                 $this->assertEqualsWithDelta($actualExpectedValue, $insertEvent->after->test_column, 0.001);
+            } elseif ($actualExpectedValue instanceof \DateTimeImmutable) {
+                $this->assertInstanceOf(\DateTimeImmutable::class, $insertEvent->after->test_column);
+                $this->assertEquals($actualExpectedValue->getTimestamp(), $insertEvent->after->test_column->getTimestamp());
+                // Additional checks for DateTimeImmutable
+                $this->assertEquals($actualExpectedValue->format('Y-m-d H:i:s'), $insertEvent->after->test_column->format('Y-m-d H:i:s'));
             } else {
                 $this->assertEquals($actualExpectedValue, $insertEvent->after->test_column);
             }
