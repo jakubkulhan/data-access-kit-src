@@ -3,6 +3,7 @@
 namespace DataAccessKit\Replication\Test;
 
 use PHPUnit\Framework\Attributes\Group;
+use PHPUnit\Framework\Attributes\DataProvider;
 use DataAccessKit\Replication\Stream;
 use DataAccessKit\Replication\EventInterface;
 use DataAccessKit\Replication\InsertEvent;
@@ -249,6 +250,174 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
                 } catch (Exception $e) {
                     // Ignore errors in cleanup
                 }
+            }
+        }
+    }
+
+    public static function dataTypeProvider(): array
+    {
+        return [
+            // Integer Types
+            ['TINYINT', 127, 127],
+            ['TINYINT UNSIGNED', 255, -1], // MySQL binlog represents max unsigned as -1
+            ['SMALLINT', 32767, 32767],
+            ['SMALLINT UNSIGNED', 65535, -1], // MySQL binlog represents max unsigned as -1
+            ['MEDIUMINT', 8388607, 8388607],
+            ['MEDIUMINT UNSIGNED', 16777215, -1], // MySQL binlog represents max unsigned as -1
+            ['INT', 2147483647, 2147483647],
+            ['INT UNSIGNED', 4294967295, -1], // MySQL binlog represents max unsigned as -1
+            ['BIGINT', '9223372036854775807', '9223372036854775807'],
+            ['BIGINT UNSIGNED', '18446744073709551615', -1], // MySQL binlog represents max unsigned as -1
+            ['BIT(8)', 'b\'11111111\'', 255],
+            ['BIT(1)', 'b\'1\'', 1],
+
+            // Fixed-Point Types
+            ['DECIMAL(10,2)', '123.45', '123.45'],
+            ['DECIMAL(5,0)', '12345', '12345'],
+            ['NUMERIC(8,3)', '12345.678', '12345.678'],
+
+            // Floating-Point Types
+            ['FLOAT', 123.456, 123.456],
+            ['DOUBLE', 123.456789, 123.456789],
+
+            // Character Types
+            ['CHAR(10)', '\'Hello\'', 'Hello'],
+            ['VARCHAR(50)', '\'Variable length\'', 'Variable length'],
+            ['BINARY(5)', 'X\'48656c6c6f\'', 'Hello'], // Use hex notation for binary data
+            ['VARBINARY(10)', 'X\'48656c6c6f\'', 'Hello'], // Use hex notation for binary data
+
+            // Text Types - these are base64 encoded in binlog
+            ['TINYTEXT', '\'Tiny text\'', 'VGlueSB0ZXh0'],
+            ['TEXT', '\'Regular text content\'', 'UmVndWxhciB0ZXh0IGNvbnRlbnQ='],
+            ['MEDIUMTEXT', '\'Medium text content\'', 'TWVkaXVtIHRleHQgY29udGVudA=='],
+            ['LONGTEXT', '\'Long text content\'', 'TG9uZyB0ZXh0IGNvbnRlbnQ='],
+
+            // Binary Large Object Types - these are base64 encoded in binlog
+            ['TINYBLOB', 'X\'48656c6c6f\'', 'SGVsbG8='], // "Hello" in base64
+            ['BLOB', 'X\'48656c6c6f20576f726c64\'', 'SGVsbG8gV29ybGQ='], // "Hello World" in base64
+            ['MEDIUMBLOB', 'X\'48656c6c6f204d656469756d\'', 'SGVsbG8gTWVkaXVt'], // "Hello Medium" in base64
+            ['LONGBLOB', 'X\'48656c6c6f204c6f6e67\'', 'SGVsbG8gTG9uZw=='], // "Hello Long" in base64
+
+            // Special String Types - these return numeric values due to binlog limitations
+            ['ENUM(\'red\',\'green\',\'blue\')', '\'red\'', 1], // ENUM returns 1-based index (string values not available in binlog metadata)
+            ['SET(\'read\',\'write\',\'execute\')', '\'read,write\'', 3], // SET returns bitmask (string values not available in binlog metadata)
+
+            // Date and Time Data Types
+            ['DATE', '\'2024-01-15\'', '2024-01-15'],
+            ['TIME', '\'14:30:45\'', '14:30:45.000000'], // TIME includes microseconds
+            ['DATETIME', '\'2024-01-15 14:30:45\'', '2024-01-15 14:30:45.000000'], // DATETIME includes microseconds
+            ['TIMESTAMP', '\'2024-01-15 14:30:45\'', 1705329045000000], // TIMESTAMP as microseconds since epoch
+            ['YEAR', '2024', '2024'],
+
+            // JSON Data Type - formatting may change
+            ['JSON', '\'{"key": "value", "number": 42}\'', '{"key":"value","number":42}'],
+
+            // NULL values for various types
+            ['VARCHAR(50)', 'NULL', null],
+            ['INT', 'NULL', null],
+            ['DATE', 'NULL', null],
+            ['JSON', 'NULL', null],
+
+            // Zero and empty values
+            ['INT', '0', 0],
+            ['VARCHAR(50)', '\'\'', ''],
+            ['TEXT', '\'\'', ''],
+
+            // Negative numbers
+            ['TINYINT', '-128', -128],
+            ['SMALLINT', '-32768', -32768],
+            ['MEDIUMINT', '-8388608', -8388608],
+            ['INT', '-2147483648', -2147483648],
+            ['BIGINT', '-9223372036854775808', '-9223372036854775808'],
+            ['DECIMAL(10,2)', '-123.45', '-123.45'],
+            ['FLOAT', '-123.456', -123.456],
+            ['DOUBLE', '-123.456789', -123.456789],
+        ];
+    }
+
+    #[DataProvider('dataTypeProvider')]
+    public function testDataTypeConversion(string $columnType, $insertValue, $expectedPhpValue): void
+    {
+        $this->requireDatabase();
+
+        $stream = null;
+        $testTableName = 'test_data_types_' . md5($columnType . serialize($insertValue));
+
+        try {
+            $this->pdo->exec("CREATE DATABASE IF NOT EXISTS `test_replication_db`");
+            $this->pdo->exec("USE `test_replication_db`");
+
+            $testPdo = new \PDO(
+                "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']};dbname=test_replication_db",
+                $this->dbConfig['user'],
+                $this->dbConfig['password']
+            );
+
+            // Detect database type
+            $stmt = $testPdo->query("SELECT VERSION()");
+            $version = $stmt->fetchColumn();
+            $isMariaDB = stripos($version, 'mariadb') !== false;
+
+            $createTableSql = "CREATE TABLE IF NOT EXISTS `{$testTableName}` (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                test_column {$columnType}
+            )";
+            $testPdo->exec($createTableSql);
+
+            $stream = new Stream($this->createReplicationConnectionUrl(['database' => 'test_replication_db']));
+            $stream->connect();
+
+            if ($insertValue === 'NULL') {
+                $insertSql = "INSERT INTO `{$testTableName}` (test_column) VALUES (NULL)";
+            } else {
+                $insertSql = "INSERT INTO `{$testTableName}` (test_column) VALUES ({$insertValue})";
+            }
+            $testPdo->exec($insertSql);
+
+            $stream->rewind();
+            $this->assertTrue($stream->valid());
+
+            $insertEvent = $stream->current();
+            $this->assertInstanceOf(InsertEvent::class, $insertEvent);
+            $this->assertEquals('test_replication_db', $insertEvent->schema);
+            $this->assertEquals($testTableName, $insertEvent->table);
+            $this->assertIsObject($insertEvent->after);
+
+            // Adjust expectations for MariaDB JSON handling
+            $actualExpectedValue = $expectedPhpValue;
+            if ($isMariaDB && strpos($columnType, 'JSON') === 0 && $expectedPhpValue === '{"key":"value","number":42}') {
+                $actualExpectedValue = 'eyJrZXkiOiAidmFsdWUiLCAibnVtYmVyIjogNDJ9'; // Base64 encoded
+            }
+
+            if ($actualExpectedValue === null) {
+                $this->assertNull($insertEvent->after->test_column);
+            } elseif (is_float($actualExpectedValue)) {
+                $this->assertEqualsWithDelta($actualExpectedValue, $insertEvent->after->test_column, 0.001);
+            } else {
+                $this->assertEquals($actualExpectedValue, $insertEvent->after->test_column);
+            }
+
+        } finally {
+            if ($stream !== null) {
+                try {
+                    $stream->disconnect();
+                } catch (Exception $e) {
+                }
+            }
+
+            try {
+                $cleanupPdo = new \PDO(
+                    "mysql:host={$this->dbConfig['host']};port={$this->dbConfig['port']};dbname=test_replication_db",
+                    $this->dbConfig['user'],
+                    $this->dbConfig['password']
+                );
+                $cleanupPdo->exec("DROP TABLE IF EXISTS `{$testTableName}`");
+            } catch (Exception $e) {
+            }
+
+            try {
+                $this->pdo->exec("DROP DATABASE IF EXISTS `test_replication_db`");
+            } catch (Exception $e) {
             }
         }
     }

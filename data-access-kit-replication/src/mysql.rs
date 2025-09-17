@@ -7,9 +7,10 @@ use mysql_binlog_connector_rust::{
     binlog_client::BinlogClient,
     binlog_stream::BinlogStream,
     event::{
-        event_data::EventData, 
+        event_data::EventData,
         event_header::EventHeader,
         table_map_event::TableMapEvent,
+        table_map::table_metadata::ColumnMetadata,
         row_event::RowEvent,
     },
     column::column_value::ColumnValue,
@@ -626,11 +627,11 @@ impl MySQLStreamDriver {
         let mut obj = ext_php_rs::types::ZendObject::new(stdclass_ce);
 
         for (i, column_value) in row.column_values.iter().enumerate() {
-            // Get column name from table metadata - error if unavailable
-            let column_name = if let Some(ref table_metadata) = table_map.table_metadata {
+            // Get column name and metadata from table metadata - error if unavailable
+            let (column_name, column_metadata) = if let Some(ref table_metadata) = table_map.table_metadata {
                 if let Some(column_metadata) = table_metadata.columns.get(i) {
                     if let Some(ref name) = column_metadata.column_name {
-                        name.clone()
+                        (name.clone(), Some(column_metadata))
                     } else {
                         return Err(PhpException::default(
                             format!("Column name not available for column index {} in table {}.{}",
@@ -650,7 +651,7 @@ impl MySQLStreamDriver {
                 ).into());
             };
 
-            let prop_zval = self.convert_column_value_to_php(column_value)?;
+            let prop_zval = self.convert_column_value_to_php(column_value, column_metadata)?;
             obj.set_property(&column_name, prop_zval)?;
         }
 
@@ -659,9 +660,9 @@ impl MySQLStreamDriver {
         Ok(result)
     }
     
-    fn convert_column_value_to_php(&self, column_value: &ColumnValue) -> PhpResult<Zval> {
+    fn convert_column_value_to_php(&self, column_value: &ColumnValue, column_metadata: Option<&ColumnMetadata>) -> PhpResult<Zval> {
         let mut zval = Zval::new();
-        
+
         match column_value {
             ColumnValue::None => {
                 zval.set_null();
@@ -713,13 +714,53 @@ impl MySQLStreamDriver {
                 zval.set_long(*value as i64);
             },
             ColumnValue::Set(value) => {
-                zval.set_long(*value as i64);
+                // Convert SET bitmask to string values using column metadata
+                if let Some(metadata) = column_metadata {
+                    if let Some(ref set_values) = metadata.set_string_values {
+                        let mut selected_values = Vec::new();
+                        let bitmask = *value as u64;
+
+                        // Check each bit position against set_string_values
+                        for (i, set_val) in set_values.iter().enumerate() {
+                            if (bitmask & (1u64 << i)) != 0 {
+                                selected_values.push(set_val.clone());
+                            }
+                        }
+
+                        let result_string = selected_values.join(",");
+                        zval.set_string(&result_string, false)?;
+                    } else {
+                        // Fallback to numeric value if no metadata
+                        zval.set_long(*value as i64);
+                    }
+                } else {
+                    // Fallback to numeric value if no metadata
+                    zval.set_long(*value as i64);
+                }
             },
             ColumnValue::Enum(value) => {
-                zval.set_long(*value as i64);
+                // Convert ENUM index to string value using column metadata
+                if let Some(metadata) = column_metadata {
+                    if let Some(ref enum_values) = metadata.enum_string_values {
+                        // ENUM values are 1-based, so subtract 1 for 0-based array access
+                        let index = (*value as usize).saturating_sub(1);
+                        if let Some(enum_val) = enum_values.get(index) {
+                            zval.set_string(enum_val, false)?;
+                        } else {
+                            // Index out of bounds - fallback to numeric value
+                            zval.set_long(*value as i64);
+                        }
+                    } else {
+                        // Fallback to numeric value if no metadata
+                        zval.set_long(*value as i64);
+                    }
+                } else {
+                    // Fallback to numeric value if no metadata
+                    zval.set_long(*value as i64);
+                }
             }
         }
-        
+
         Ok(zval)
     }
     
