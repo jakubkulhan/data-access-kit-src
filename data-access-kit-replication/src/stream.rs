@@ -29,41 +29,36 @@ pub struct Stream {
 impl Stream {
     fn create_driver(connection_url: &str) -> Result<Box<dyn StreamDriver>, PhpException> {
         match Url::parse(connection_url) {
-            Ok(url) => {
-                match url.scheme() {
-                    "mysql" => {
-                        let host = url.host_str()
-                            .unwrap_or("localhost")
-                            .to_string();
+            Ok(url) => match url.scheme() {
+                "mysql" => {
+                    let host = url.host_str().unwrap_or("localhost").to_string();
 
-                        let port = url.port().unwrap_or(3306);
+                    let port = url.port().unwrap_or(3306);
 
-                        let user = if url.username().is_empty() {
-                            "root".to_string()
-                        } else {
-                            url.username().to_string()
-                        };
+                    let user = if url.username().is_empty() {
+                        "root".to_string()
+                    } else {
+                        url.username().to_string()
+                    };
 
-                        let password = url.password()
-                            .unwrap_or("")
-                            .to_string();
+                    let password = url.password().unwrap_or("").to_string();
 
-                        let server_id = url.query_pairs()
-                            .find(|(key, _)| key == "server_id")
-                            .and_then(|(_, value)| value.parse::<u32>().ok());
+                    let server_id = url
+                        .query_pairs()
+                        .find(|(key, _)| key == "server_id")
+                        .and_then(|(_, value)| value.parse::<u32>().ok());
 
-                        Ok(Box::new(MySQLStreamDriver::new(
-                            host,
-                            port,
-                            user,
-                            password,
-                            server_id,
-                        )))
-                    },
-                    scheme => Err(PhpException::default(format!("Unsupported protocol: {}", scheme).into())),
+                    Ok(Box::new(MySQLStreamDriver::new(
+                        host, port, user, password, server_id,
+                    )))
                 }
+                scheme => Err(PhpException::default(
+                    format!("Unsupported protocol: {}", scheme).into(),
+                )),
             },
-            Err(e) => Err(PhpException::default(format!("Invalid connection URL: {}", e).into())),
+            Err(e) => Err(PhpException::default(
+                format!("Invalid connection URL: {}", e).into(),
+            )),
         }
     }
 }
@@ -72,9 +67,7 @@ impl Stream {
 impl Stream {
     pub fn __construct(connection_url: String) -> PhpResult<Self> {
         let driver = Self::create_driver(&connection_url)?;
-        Ok(Stream {
-            driver,
-        })
+        Ok(Stream { driver })
     }
 
     pub fn connect(&mut self) -> PhpResult<()> {

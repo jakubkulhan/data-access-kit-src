@@ -1,10 +1,10 @@
-use ext_php_rs::prelude::*;
-use ext_php_rs::ffi;
-use ext_php_rs::types::Zval;
 use ext_php_rs::convert::{FromZval, IntoZval};
-use ext_php_rs::zend::ClassEntry;
-use ext_php_rs::flags::{ClassFlags, DataType};
 use ext_php_rs::error::Result;
+use ext_php_rs::ffi;
+use ext_php_rs::flags::{ClassFlags, DataType};
+use ext_php_rs::prelude::*;
+use ext_php_rs::types::Zval;
+use ext_php_rs::zend::ClassEntry;
 use std::ffi::CString;
 use std::{mem, ptr};
 
@@ -14,7 +14,9 @@ static mut EVENT_INTERFACE: *mut ClassEntry = ptr::null_mut();
 // Function to get EventInterface CE
 pub fn event_interface_ce() -> &'static ClassEntry {
     unsafe {
-        EVENT_INTERFACE.as_ref().expect("EventInterface not initialized")
+        EVENT_INTERFACE
+            .as_ref()
+            .expect("EventInterface not initialized")
     }
 }
 
@@ -25,20 +27,15 @@ pub unsafe fn register_event_interface() {
 
     // Set the interface name
     let name = CString::new("DataAccessKit\\Replication\\EventInterface").unwrap();
-    interface_ce.name = ffi::ext_php_rs_zend_string_init(
-        name.as_ptr(),
-        name.as_bytes().len(),
-        true
-    );
+    interface_ce.name =
+        ffi::ext_php_rs_zend_string_init(name.as_ptr(), name.as_bytes().len(), true);
 
     // Set interface flags
     interface_ce.ce_flags = ClassFlags::Interface.bits();
 
     // Register the interface
-    let registered = ffi::zend_register_internal_class_ex(
-        &mut interface_ce as *mut _,
-        ptr::null_mut(),
-    );
+    let registered =
+        ffi::zend_register_internal_class_ex(&mut interface_ce as *mut _, ptr::null_mut());
 
     if registered.is_null() {
         eprintln!("Failed to register EventInterface");

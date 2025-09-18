@@ -70,6 +70,24 @@ public function testSomeAction(): void
 - **Do not add comments to PHP test files** - keep test code clean and minimal
 - Group related assertions with clear, descriptive assertion messages
 
+## Rust Code Guidelines
+
+### Formatting Requirements
+
+**Always run `cargo fmt` after making changes to Rust code.** This ensures consistent formatting across the codebase.
+
+```bash
+cargo fmt
+```
+
+The formatter will automatically:
+- Organize imports alphabetically
+- Apply consistent indentation
+- Format code according to Rust style guidelines
+- Ensure consistent spacing and line breaks
+
+**Important:** Run `cargo fmt` before committing any Rust code changes.
+
 ## Rust Import Rules
 
 ### Import Organization Guidelines

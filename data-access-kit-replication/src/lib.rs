@@ -1,15 +1,14 @@
 use ext_php_rs::prelude::*;
 
-mod stream;
 mod checkpointer;
-mod filter;
 mod events;
+mod filter;
+mod stream;
 
-use stream::Stream;
 use checkpointer::Checkpointer;
+use events::{DeleteEvent, InsertEvent, UpdateEvent};
 use filter::Filter;
-use events::{InsertEvent, UpdateEvent, DeleteEvent};
-
+use stream::Stream;
 
 fn startup_function(_type: i32, _module_number: i32) -> i32 {
     unsafe {

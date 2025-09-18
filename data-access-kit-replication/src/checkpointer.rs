@@ -1,8 +1,8 @@
-use ext_php_rs::prelude::*;
 use ext_php_rs::ffi;
+use ext_php_rs::flags::{ClassFlags, DataType};
+use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
 use ext_php_rs::zend::{ClassEntry, ZendType};
-use ext_php_rs::flags::{ClassFlags, DataType};
 use std::ffi::CString;
 use std::{mem, ptr};
 
@@ -16,11 +16,8 @@ pub unsafe fn register_checkpointer_interface() {
 
     // Set the interface name
     let name = CString::new("DataAccessKit\\Replication\\StreamCheckpointerInterface").unwrap();
-    interface_ce.name = ffi::ext_php_rs_zend_string_init(
-        name.as_ptr(),
-        name.as_bytes().len(),
-        true
-    );
+    interface_ce.name =
+        ffi::ext_php_rs_zend_string_init(name.as_ptr(), name.as_bytes().len(), true);
 
     // Set interface flags
     interface_ce.ce_flags = ClassFlags::Interface.bits();
@@ -104,10 +101,8 @@ pub unsafe fn register_checkpointer_interface() {
     interface_ce.info.internal.builtin_functions = functions.as_ptr();
 
     // Register the interface
-    let registered = ffi::zend_register_internal_class_ex(
-        &mut interface_ce as *mut _,
-        ptr::null_mut(),
-    );
+    let registered =
+        ffi::zend_register_internal_class_ex(&mut interface_ce as *mut _, ptr::null_mut());
 
     // Prevent the vectors and strings from being dropped
     mem::forget(functions);
@@ -137,8 +132,9 @@ impl Checkpointer {
         // Validate that the object implements the required interface
         if !php_checkpointer.is_object() {
             return Err(PhpException::default(
-                "Checkpointer must be an object implementing StreamCheckpointerInterface".into()
-            ).into());
+                "Checkpointer must be an object implementing StreamCheckpointerInterface".into(),
+            )
+            .into());
         }
 
         // Use shallow_clone to safely store the Zval reference
@@ -151,16 +147,20 @@ impl Checkpointer {
     /// Returns None if no checkpoint exists or if the method returns null
     pub fn load_last_checkpoint(&self) -> PhpResult<Option<String>> {
         // Call the loadLastCheckpoint() method on the PHP object
-        let result = self.php_object.try_call_method("loadLastCheckpoint", Vec::<&dyn ext_php_rs::convert::IntoZvalDyn>::new())?;
+        let result = self.php_object.try_call_method(
+            "loadLastCheckpoint",
+            Vec::<&dyn ext_php_rs::convert::IntoZvalDyn>::new(),
+        )?;
 
         if result.is_null() {
             Ok(None)
         } else if result.is_string() {
             Ok(Some(result.string().unwrap_or_default().to_string()))
         } else {
-            Err(PhpException::default(
-                "loadLastCheckpoint() must return string or null".into()
-            ).into())
+            Err(
+                PhpException::default("loadLastCheckpoint() must return string or null".into())
+                    .into(),
+            )
         }
     }
 
@@ -173,4 +173,3 @@ impl Checkpointer {
         Ok(())
     }
 }
-
