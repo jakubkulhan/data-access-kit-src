@@ -6,6 +6,7 @@
 
 - [DataAccessKit](https://github.com/jakubkulhan/data-access-kit#readme) - Persistence layer based on Doctrine\DBAL and repository generator.
 - [DataAccessKit\Symfony](https://github.com/jakubkulhan/data-access-kit-symfony#readme) - Integration with Symfony framework.
+- [DataAccessKit\Replication](https://github.com/jakubkulhan/data-access-kit-replication#readme) - Real-time MySQL/MariaDB binary log replication stream for PHP.
 
 ## Contributing
 
