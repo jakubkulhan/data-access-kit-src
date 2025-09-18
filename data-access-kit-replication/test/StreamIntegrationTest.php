@@ -436,5 +436,125 @@ class StreamIntegrationTest extends AbstractIntegrationTestCase
         }
     }
 
+    public function testBulkOperationsStreamFlow(): void
+    {
+        $this->requireDatabase();
+
+        $stream = null;
+
+        try {
+            $this->pdo->exec("CREATE DATABASE IF NOT EXISTS `test_replication_db`");
+            $this->pdo->exec("USE `test_replication_db`");
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS `test_bulk_users` (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    email VARCHAR(100) NOT NULL,
+                    status VARCHAR(20) DEFAULT 'active'
+                )
+            ");
+
+            $stream = new Stream($this->createReplicationConnectionUrl(['database' => 'test_replication_db']));
+            $stream->connect();
+
+            // Batch insert 10 rows in a single statement
+            $this->pdo->exec("
+                INSERT INTO `test_bulk_users` (name, email) VALUES
+                ('User 1', 'user1@example.com'),
+                ('User 2', 'user2@example.com'),
+                ('User 3', 'user3@example.com'),
+                ('User 4', 'user4@example.com'),
+                ('User 5', 'user5@example.com'),
+                ('User 6', 'user6@example.com'),
+                ('User 7', 'user7@example.com'),
+                ('User 8', 'user8@example.com'),
+                ('User 9', 'user9@example.com'),
+                ('User 10', 'user10@example.com')
+            ");
+
+            // Update all 10 rows
+            $this->pdo->exec("
+                UPDATE `test_bulk_users`
+                SET status = 'updated', name = CONCAT(name, ' - Updated')
+                WHERE status = 'active'
+            ");
+
+            // Delete all 10 rows
+            $this->pdo->exec("DELETE FROM `test_bulk_users` WHERE status = 'updated'");
+
+            $eventCount = 0;
+            $insertEventCount = 0;
+            $updateEventCount = 0;
+            $deleteEventCount = 0;
+
+            // Process all 30 events from bulk operations (10 batch inserts + 10 bulk updates + 10 bulk deletes)
+            foreach ($stream as $event) {
+                $this->assertInstanceOf(EventInterface::class, $event);
+                $this->assertEquals('test_replication_db', $event->schema);
+                $this->assertEquals('test_bulk_users', $event->table);
+
+                if ($event->type === EventInterface::INSERT) {
+                    $insertEventCount++;
+                    $this->assertInstanceOf(InsertEvent::class, $event);
+                    $this->assertIsObject($event->after);
+                    $this->assertStringContainsString('User ', $event->after->name);
+                    $this->assertStringContainsString('@example.com', $event->after->email);
+                    $this->assertEquals('active', $event->after->status);
+                } elseif ($event->type === EventInterface::UPDATE) {
+                    $updateEventCount++;
+                    $this->assertInstanceOf(UpdateEvent::class, $event);
+                    $this->assertIsObject($event->before);
+                    $this->assertIsObject($event->after);
+                    $this->assertEquals('active', $event->before->status);
+                    $this->assertEquals('updated', $event->after->status);
+                    $this->assertStringContainsString(' - Updated', $event->after->name);
+                } elseif ($event->type === EventInterface::DELETE) {
+                    $deleteEventCount++;
+                    $this->assertInstanceOf(DeleteEvent::class, $event);
+                    $this->assertIsObject($event->before);
+                    $this->assertEquals('updated', $event->before->status);
+                    $this->assertStringContainsString(' - Updated', $event->before->name);
+                }
+
+                $eventCount++;
+
+                if ($eventCount >= 30) {
+                    break;
+                }
+            }
+
+            // Verify we processed exactly 30 events: 10 inserts, 10 updates, 10 deletes
+            $this->assertEquals(30, $eventCount);
+            $this->assertEquals(10, $insertEventCount);
+            $this->assertEquals(10, $updateEventCount);
+            $this->assertEquals(10, $deleteEventCount);
+
+            $stream->disconnect();
+            $this->assertFalse($stream->valid());
+
+        } finally {
+            if ($stream !== null) {
+                try {
+                    $stream->disconnect();
+                } catch (Exception $e) {
+                    // Ignore disconnect errors in cleanup
+                }
+            }
+
+            try {
+                $this->pdo->exec("USE `test_replication_db`");
+                $this->pdo->exec("DROP TABLE IF EXISTS `test_bulk_users`");
+            } catch (Exception $e) {
+                // Ignore cleanup errors
+            }
+
+            try {
+                $this->pdo->exec("DROP DATABASE IF EXISTS `test_replication_db`");
+            } catch (Exception $e) {
+                // Ignore cleanup errors
+            }
+        }
+    }
+
 
 }

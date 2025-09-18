@@ -69,6 +69,7 @@ abstract class AbstractIntegrationTestCase extends TestCase
             $stmt->execute(['FULL']);
 
         } catch (\Exception $e) {
+            $this->pdo = null;
         }
     }
 

@@ -18,6 +18,7 @@ use mysql_binlog_connector_rust::{
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::LazyLock;
+use std::collections::VecDeque;
 use tokio::runtime::Runtime;
 
 macro_rules! with_runtime_block_on {
@@ -55,6 +56,7 @@ pub struct MySQLStreamDriver {
     is_mariadb: bool,
     use_gtid_checkpoints: bool,
     current_event: Option<Zval>,
+    event_queue: VecDeque<Zval>,  // Queue for buffering multi-row events
     event_iterator_started: bool,
     connected: bool,
     table_map: std::collections::HashMap<u64, TableMapEvent>,
@@ -89,6 +91,7 @@ impl MySQLStreamDriver {
             is_mariadb: false,
             use_gtid_checkpoints: false,
             current_event: None,
+            event_queue: VecDeque::new(),
             event_iterator_started: false,
             connected: false,
             table_map: std::collections::HashMap::new(),
@@ -398,7 +401,16 @@ impl MySQLStreamDriver {
     }
     
     fn fetch_next_event(&mut self) -> PhpResult<()> {
-        with_runtime_block_on!(self, async {
+        // Structure to hold event data for processing outside the async block
+        enum EventToProcess {
+            Insert(EventHeader, TableMapEvent, Vec<RowEvent>),
+            Update(EventHeader, TableMapEvent, Vec<(RowEvent, RowEvent)>),
+            Delete(EventHeader, TableMapEvent, Vec<RowEvent>),
+        }
+
+        let mut events_to_process: Option<EventToProcess> = None;
+
+        let async_result: PhpResult<()> = with_runtime_block_on!(self, async {
             if let Some(ref mut stream) = self.binlog_stream {
                 loop {
                     // Read next event from binlog stream
@@ -434,27 +446,13 @@ impl MySQLStreamDriver {
                                     }
                                 }
 
-                                // Convert to InsertEvent
-                                for row in &write_rows_event.rows {
-                                    match self.create_insert_event_from_binlog(
-                                        &header,
-                                        table_map,
-                                        row
-                                    ) {
-                                        Ok(event_obj) => {
-                                            self.current_event = Some(event_obj);
-                                            // Save checkpoint after successfully creating event
-                                            self.save_current_checkpoint(&header)?;
-                                            return Ok(());
-                                        }
-                                        Err(e) => {
-                                            // Log the error but continue - maybe the class loading will work later
-                                            eprintln!("Failed to create InsertEvent: {:?}", e);
-                                            self.current_event = None;
-                                            return Ok(());
-                                        }
-                                    }
-                                }
+                                // Store event data for processing outside async block
+                                events_to_process = Some(EventToProcess::Insert(
+                                    header,
+                                    table_map.clone(),
+                                    write_rows_event.rows
+                                ));
+                                break; // Exit the loop to process events
                             }
                             // Skip if no table map found
                             continue;
@@ -480,19 +478,13 @@ impl MySQLStreamDriver {
                                     }
                                 }
 
-                                // Convert to UpdateEvent
-                                for (before_row, after_row) in &update_rows_event.rows {
-                                    let event_obj = self.create_update_event_from_binlog(
-                                        &header,
-                                        table_map,
-                                        before_row,
-                                        after_row
-                                    )?;
-                                    self.current_event = Some(event_obj);
-                                    // Save checkpoint after successfully creating event
-                                    self.save_current_checkpoint(&header)?;
-                                    return Ok(());
-                                }
+                                // Store event data for processing outside async block
+                                events_to_process = Some(EventToProcess::Update(
+                                    header,
+                                    table_map.clone(),
+                                    update_rows_event.rows
+                                ));
+                                break; // Exit the loop to process events
                             }
                             // Skip if no table map found
                             continue;
@@ -518,18 +510,13 @@ impl MySQLStreamDriver {
                                     }
                                 }
 
-                                // Convert to DeleteEvent
-                                for row in &delete_rows_event.rows {
-                                    let event_obj = self.create_delete_event_from_binlog(
-                                        &header,
-                                        table_map,
-                                        row
-                                    )?;
-                                    self.current_event = Some(event_obj);
-                                    // Save checkpoint after successfully creating event
-                                    self.save_current_checkpoint(&header)?;
-                                    return Ok(());
-                                }
+                                // Store event data for processing outside async block
+                                events_to_process = Some(EventToProcess::Delete(
+                                    header,
+                                    table_map.clone(),
+                                    delete_rows_event.rows
+                                ));
+                                break; // Exit the loop to process events
                             }
                             // Skip if no table map found
                             continue;
@@ -542,11 +529,65 @@ impl MySQLStreamDriver {
                     }
                 }
             } else {
-                // No binlog stream available, set current_event to None
-                self.current_event = None;
-                Ok(())
+                // No binlog stream available
             }
-        })
+            Ok(())
+        });
+
+        async_result?;
+
+        // Process events outside the async block to avoid borrow checker issues
+        if let Some(events) = events_to_process {
+            match events {
+                EventToProcess::Insert(header, table_map, rows) => {
+                    for (_idx, row) in rows.iter().enumerate() {
+                        match self.create_insert_event_from_binlog(&header, &table_map, row) {
+                            Ok(event_obj) => {
+                                self.event_queue.push_back(event_obj);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to create event: {:?}", e);
+                            }
+                        }
+                    }
+                    if !self.event_queue.is_empty() {
+                        self.save_current_checkpoint(&header)?;
+                    }
+                }
+                EventToProcess::Update(header, table_map, rows) => {
+                    for (_idx, (before_row, after_row)) in rows.iter().enumerate() {
+                        match self.create_update_event_from_binlog(&header, &table_map, before_row, after_row) {
+                            Ok(event_obj) => {
+                                self.event_queue.push_back(event_obj);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to create event: {:?}", e);
+                            }
+                        }
+                    }
+                    if !self.event_queue.is_empty() {
+                        self.save_current_checkpoint(&header)?;
+                    }
+                }
+                EventToProcess::Delete(header, table_map, rows) => {
+                    for (_idx, row) in rows.iter().enumerate() {
+                        match self.create_delete_event_from_binlog(&header, &table_map, row) {
+                            Ok(event_obj) => {
+                                self.event_queue.push_back(event_obj);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to create event: {:?}", e);
+                            }
+                        }
+                    }
+                    if !self.event_queue.is_empty() {
+                        self.save_current_checkpoint(&header)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
     
     fn create_insert_event_from_binlog(
@@ -1011,13 +1052,14 @@ impl StreamDriver for MySQLStreamDriver {
         self.is_mariadb = false;
         self.use_gtid_checkpoints = false;
         self.current_event = None;
+        self.event_queue.clear();
         self.event_iterator_started = false;
         self.connected = false;
         self.table_map.clear();
         self.checkpointer = None;
         self.filter = None;
         self.runtime = None;
-        
+
         Ok(())
     }
 
@@ -1073,7 +1115,23 @@ impl StreamDriver for MySQLStreamDriver {
         }
 
         self.position += 1;
-        self.fetch_next_event()?;
+
+        // First check if we have events in the queue
+        if let Some(event) = self.event_queue.pop_front() {
+            self.current_event = Some(event);
+        } else {
+            // Queue is empty, fetch more events from binlog
+            self.fetch_next_event()?;
+
+            // After fetching, pop the first event from queue
+            if let Some(event) = self.event_queue.pop_front() {
+                self.current_event = Some(event);
+            } else {
+                // No events available
+                self.current_event = None;
+            }
+        }
+
         Ok(())
     }
 
@@ -1082,6 +1140,10 @@ impl StreamDriver for MySQLStreamDriver {
         if !self.connected {
             self.connect()?;
         }
+
+        // Clear the event queue on rewind
+        self.event_queue.clear();
+        self.current_event = None;
 
         // Load checkpoint BEFORE creating BinlogClient so it uses the checkpoint position
         // instead of the current database position
@@ -1095,13 +1157,19 @@ impl StreamDriver for MySQLStreamDriver {
         self.position = 0;
         self.event_iterator_started = true;
 
-        // Fetch the first event
+        // Fetch the first batch of events
         self.fetch_next_event()?;
+
+        // Pop the first event from queue to current_event
+        if let Some(event) = self.event_queue.pop_front() {
+            self.current_event = Some(event);
+        }
 
         Ok(())
     }
 
     fn valid(&self) -> PhpResult<bool> {
-        Ok(self.connected && self.event_iterator_started && self.current_event.is_some())
+        let is_valid = self.connected && self.event_iterator_started && self.current_event.is_some();
+        Ok(is_valid)
     }
 }
