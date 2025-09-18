@@ -4,8 +4,7 @@ use ext_php_rs::types::Zval;
 use ext_php_rs::zend::{ClassEntry, ZendType};
 use ext_php_rs::flags::{ClassFlags, DataType};
 use std::ffi::CString;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
 // Global pointer to StreamCheckpointerInterface
 static mut CHECKPOINTER_INTERFACE: *mut ClassEntry = ptr::null_mut();

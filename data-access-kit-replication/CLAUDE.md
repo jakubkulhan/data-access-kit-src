@@ -70,6 +70,73 @@ public function testSomeAction(): void
 - **Do not add comments to PHP test files** - keep test code clean and minimal
 - Group related assertions with clear, descriptive assertion messages
 
+## Rust Import Rules
+
+### Import Organization Guidelines
+
+When writing or refactoring Rust code in this project, follow these import rules:
+
+1. **Use statements always at the top of the file, never inside functions**
+   - All `use` statements must be placed at the top of the file after any comments or attributes
+   - Never place `use` statements inside functions, methods, or other code blocks
+
+2. **Types should be imported directly**
+   - Import types (structs, enums, traits) by their full path so they can be used directly
+   - Examples:
+     ```rust
+     use std::ffi::CString;
+     use ext_php_rs::types::Zval;
+     use ext_php_rs::zend::ClassEntry;
+     ```
+
+3. **Functions should be used with module prefix**
+   - Import modules containing functions, then call functions with module prefix
+   - Examples:
+     ```rust
+     use std::{mem, ptr};
+
+     // Then call:
+     mem::zeroed()
+     ptr::null_mut()
+     ```
+
+4. **Group related imports**
+   - Group imports from the same crate/module using braces
+   - Examples:
+     ```rust
+     use std::{mem, ptr};
+     use std::collections::{HashMap, VecDeque};
+     use ext_php_rs::zend::{self, ce};
+     ```
+
+### Examples
+
+**Good:**
+```rust
+use ext_php_rs::prelude::*;
+use ext_php_rs::types::Zval;
+use ext_php_rs::zend::{ClassEntry, ZendType};
+use std::ffi::CString;
+use std::{mem, ptr};
+
+fn example() {
+    let interface_ce: ffi::zend_class_entry = mem::zeroed();
+    let null_ptr = ptr::null_mut();
+}
+```
+
+**Bad:**
+```rust
+use ext_php_rs::prelude::*;
+
+fn example() {
+    use std::mem;  // ❌ use inside function
+    use std::ptr;  // ❌ use inside function
+
+    let interface_ce = mem::zeroed();
+}
+```
+
 ## Documentation
 
 The project specification is in `SPEC.md`. **Update SPEC.md when implementation diverges from the documented design** to keep documentation accurate and current.

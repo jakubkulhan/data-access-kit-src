@@ -18,7 +18,8 @@ use mysql_binlog_connector_rust::{
 };
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::LazyLock;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::runtime::Runtime;
 
 macro_rules! with_runtime_block_on {
@@ -33,7 +34,6 @@ macro_rules! with_runtime_block_on {
 
 
 static NEXT_SERVER_ID: LazyLock<AtomicU32> = LazyLock::new(|| {
-    use std::time::{SystemTime, UNIX_EPOCH};
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)
         .unwrap_or_default().as_secs() as u32;
     // Use lower 16 bits of timestamp + random component to avoid conflicts
@@ -59,7 +59,7 @@ pub struct MySQLStreamDriver {
     event_queue: VecDeque<Zval>,  // Queue for buffering multi-row events
     event_iterator_started: bool,
     connected: bool,
-    table_map: std::collections::HashMap<u64, TableMapEvent>,
+    table_map: HashMap<u64, TableMapEvent>,
     checkpointer: Option<Checkpointer>,
     filter: Option<Filter>,
     runtime: Option<Runtime>,
@@ -94,7 +94,7 @@ impl MySQLStreamDriver {
             event_queue: VecDeque::new(),
             event_iterator_started: false,
             connected: false,
-            table_map: std::collections::HashMap::new(),
+            table_map: HashMap::new(),
             checkpointer: None,
             filter: None,
             runtime: None,

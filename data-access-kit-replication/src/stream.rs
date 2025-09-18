@@ -1,6 +1,6 @@
 use ext_php_rs::prelude::*;
 use ext_php_rs::types::Zval;
-use ext_php_rs::zend::ce;
+use ext_php_rs::zend::{self, ce};
 use url::Url;
 
 mod mysql;

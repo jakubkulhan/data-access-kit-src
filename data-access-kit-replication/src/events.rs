@@ -6,8 +6,7 @@ use ext_php_rs::zend::ClassEntry;
 use ext_php_rs::flags::{ClassFlags, DataType};
 use ext_php_rs::error::Result;
 use std::ffi::CString;
-use std::mem;
-use std::ptr;
+use std::{mem, ptr};
 
 // Global pointer to EventInterface
 static mut EVENT_INTERFACE: *mut ClassEntry = ptr::null_mut();
